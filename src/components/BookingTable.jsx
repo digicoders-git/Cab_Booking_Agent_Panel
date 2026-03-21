@@ -1,7 +1,9 @@
 // src/components/BookingTable.jsx
 import { useState, useMemo } from 'react';
-import { FaChevronDown, FaChevronUp, FaSearch, FaTimes, FaSync } from 'react-icons/fa';
+import { FaChevronDown, FaChevronUp, FaSearch, FaTimes, FaSync, FaBan } from 'react-icons/fa';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Phone } from 'lucide-react';
+import { agentService } from '../api/agentApi';
+import { toast } from 'sonner';
 
 const StatusBadge = ({ status }) => {
   const cfg = {
@@ -14,8 +16,37 @@ const StatusBadge = ({ status }) => {
   return <span className={`px-2 py-1 ${cfg} rounded-full text-xs font-medium`}>{status || '—'}</span>;
 };
 
-const BookingRow = ({ booking }) => {
+const BookingRow = ({ booking, onRefresh }) => {
   const [expanded, setExpanded] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+
+  const canCancel = ['pending', 'ongoing'].includes(booking.bookingStatus?.toLowerCase());
+
+  const handleCancelBooking = async () => {
+    if (!cancelReason.trim()) {
+      toast.error('Cancel reason zaruri hai');
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const response = await agentService.cancelBooking(booking._id, cancelReason);
+      if (response.success) {
+        toast.success('Booking successfully cancel ho gayi!');
+        setShowCancelModal(false);
+        setCancelReason('');
+        if (onRefresh) onRefresh();
+      } else {
+        toast.error(response.message || 'Cancel failed');
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Cancel failed');
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   return (
     <>
@@ -66,8 +97,24 @@ const BookingRow = ({ booking }) => {
           <p className="text-xs text-gray-600">{new Date(booking.createdAt).toLocaleDateString('en-IN')}</p>
           <p className="text-xs text-gray-400">{new Date(booking.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
         </td>
-        <td className="px-4 py-3 text-gray-400">
-          {expanded ? <FaChevronUp size={11} /> : <FaChevronDown size={11} />}
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            {canCancel && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowCancelModal(true);
+                }}
+                className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                title="Cancel Booking"
+              >
+                <FaBan size={14} />
+              </button>
+            )}
+            <button onClick={() => setExpanded(p => !p)} className="text-gray-400">
+              {expanded ? <FaChevronUp size={11} /> : <FaChevronDown size={11} />}
+            </button>
+          </div>
         </td>
       </tr>
 
@@ -125,6 +172,55 @@ const BookingRow = ({ booking }) => {
           </td>
         </tr>
       )}
+
+      {/* Cancel Modal */}
+      {showCancelModal && (
+        <tr>
+          <td colSpan={11}>
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCancelModal(false)}>
+              <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                    <FaBan className="text-red-600" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Cancel Booking</h3>
+                    <p className="text-xs text-gray-500">Booking ID: {booking._id?.slice(-8)}</p>
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cancel Reason *</label>
+                  <textarea
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 resize-none"
+                    rows={4}
+                    placeholder="e.g., Customer ne cancel karne ko kaha"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowCancelModal(false);
+                      setCancelReason('');
+                    }}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-all font-medium"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleCancelBooking}
+                    disabled={cancelling || !cancelReason.trim()}
+                    className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all disabled:opacity-50 font-medium"
+                  >
+                    {cancelling ? 'Cancelling...' : 'Confirm Cancel'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
     </>
   );
 };
@@ -137,7 +233,7 @@ const BookingRow = ({ booking }) => {
 //   limit      — number (optional) — if set, hides pagination/filter, shows only N rows
 //   showSearch — boolean (default true, false when limit is set)
 // ─────────────────────────────────────────────────────────────
-export default function BookingTable({ bookings = [], loading = false, limit, showSearch = true }) {
+export default function BookingTable({ bookings = [], loading = false, limit, showSearch = true, onRefresh }) {
   const [search, setSearch]           = useState('');
   const [filter, setFilter]           = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -239,7 +335,7 @@ export default function BookingTable({ bookings = [], loading = false, limit, sh
                 <th className="px-4 py-3 text-left">Payment</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Date</th>
-                <th className="px-4 py-3"></th>
+                <th className="px-4 py-3 text-left">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -256,7 +352,7 @@ export default function BookingTable({ bookings = [], loading = false, limit, sh
                   </td>
                 </tr>
               ) : (
-                displayed.map(b => <BookingRow key={b._id} booking={b} />)
+                displayed.map(b => <BookingRow key={b._id} booking={b} onRefresh={onRefresh} />)
               )}
             </tbody>
           </table>

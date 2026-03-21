@@ -62,6 +62,12 @@ export const agentService = {
     return response.data;
   },
 
+  // ❌ Cancel Booking
+  cancelBooking: async (bookingId, reason) => {
+    const response = await agentApi.put(`/api/bookings/cancel/${bookingId}`, { reason });
+    return response.data;
+  },
+
   // Wallet
   getWalletBalance: async () => {
     const response = await agentApi.get('/api/wallet/my-wallet');

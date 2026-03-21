@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { agentService } from '../../api/agentApi';
 import { toast } from 'sonner';
+import Swal from 'sweetalert2';
 import {
     FaArrowLeft, FaUser, FaPhone, FaCar, FaSearch,
     FaSpinner, FaCheckCircle, FaExclamationTriangle, FaUsers,
@@ -10,12 +11,16 @@ import {
 } from 'react-icons/fa';
 import { MapPin, User, Phone, Calendar, Clock, Navigation, X } from 'lucide-react';
 import GOOGLE_MAPS_API from '../../utils/locationUtils';
+import GoogleMapView from '../../components/GoogleMapView';
 
 export default function CreateBooking() {
     const navigate = useNavigate();
 
     // Current Step
     const [currentStep, setCurrentStep] = useState(1);
+
+    // Google Maps loaded state
+    const [mapsLoaded, setMapsLoaded] = useState(false);
 
     // Step 1: Passenger
     const [passengerName, setPassengerName] = useState('');
@@ -30,6 +35,11 @@ export default function CreateBooking() {
     const [dropSuggestions, setDropSuggestions] = useState([]);
     const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
     const [showDropSuggestions, setShowDropSuggestions] = useState(false);
+    const [gettingLocation, setGettingLocation] = useState(false);
+    const [showMap, setShowMap] = useState(false);
+    const [mapCenter, setMapCenter] = useState({ lat: 26.8467, lng: 80.9462 }); // Default: Lucknow
+    const [pickupMarker, setPickupMarker] = useState(null);
+    const [dropMarker, setDropMarker] = useState(null);
 
     // Step 3: Ride Type
     const [rideType, setRideType] = useState('');
@@ -43,39 +53,117 @@ export default function CreateBooking() {
     const [showSeatSelection, setShowSeatSelection] = useState(false);
 
     // Step 5: Schedule
-    const [pickupDate, setPickupDate] = useState('');
-    const [pickupTime, setPickupTime] = useState('');
     const [creating, setCreating] = useState(false);
+
+    // Wait for Google Maps to load
+    useEffect(() => {
+        const checkMapsLoaded = async () => {
+            console.log('⏳ Waiting for Google Maps to load...');
+            const loaded = await GOOGLE_MAPS_API.waitForLoad();
+            console.log('🗺️ Google Maps loaded:', loaded);
+            setMapsLoaded(loaded);
+            if (!loaded) {
+                toast.error('Google Maps load nahi hua. Page refresh karo.');
+            } else {
+                toast.success('Google Maps ready! 🗺️');
+            }
+        };
+        checkMapsLoaded();
+    }, []);
 
     // Suggestions
     useEffect(() => {
-        if (pickupAddress.length < 2) { setPickupSuggestions([]); setShowPickupSuggestions(false); return; }
+        if (!mapsLoaded || pickupAddress.length < 2) {
+            setPickupSuggestions([]);
+            setShowPickupSuggestions(false);
+            return;
+        }
+        // Don't fetch if suggestions are hidden (user just selected)
+        if (!showPickupSuggestions) return;
+
+        console.log('🔍 Fetching pickup suggestions for:', pickupAddress);
         const timer = setTimeout(async () => {
             const results = await GOOGLE_MAPS_API.getSuggestions(pickupAddress);
+            console.log('✅ Pickup suggestions received:', results);
+            console.log('✅ Pickup suggestions length:', results.length);
             setPickupSuggestions(results);
             setShowPickupSuggestions(results.length > 0);
+            console.log('👁️ Show pickup suggestions:', results.length > 0);
         }, 400);
         return () => clearTimeout(timer);
-    }, [pickupAddress]);
+    }, [pickupAddress, mapsLoaded, showPickupSuggestions]);
 
     useEffect(() => {
-        if (dropAddress.length < 2) { setDropSuggestions([]); setShowDropSuggestions(false); return; }
+        if (!mapsLoaded || dropAddress.length < 2) {
+            setDropSuggestions([]);
+            setShowDropSuggestions(false);
+            return;
+        }
+        // Don't fetch if suggestions are hidden (user just selected)
+        if (!showDropSuggestions) return;
+
+        console.log('🔍 Fetching drop suggestions for:', dropAddress);
         const timer = setTimeout(async () => {
             const results = await GOOGLE_MAPS_API.getSuggestions(dropAddress);
+            console.log('✅ Drop suggestions received:', results);
+            console.log('✅ Drop suggestions length:', results.length);
             setDropSuggestions(results);
             setShowDropSuggestions(results.length > 0);
+            console.log('👁️ Show drop suggestions:', results.length > 0);
         }, 400);
         return () => clearTimeout(timer);
-    }, [dropAddress]);
+    }, [dropAddress, mapsLoaded, showDropSuggestions]);
 
     const selectPickup = (place) => {
         setPickupAddress(place.description);
+        setPickupSuggestions([]);
         setShowPickupSuggestions(false);
     };
 
     const selectDrop = (place) => {
         setDropAddress(place.description);
+        setDropSuggestions([]);
         setShowDropSuggestions(false);
+    };
+
+    // Get Current Location
+    const getCurrentLocation = async () => {
+        if (!navigator.geolocation) {
+            toast.error('Geolocation supported nahi hai tumhare browser mein');
+            return;
+        }
+
+        setGettingLocation(true);
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+
+                try {
+                    // Reverse geocode to get address
+                    const geocoder = new window.google.maps.Geocoder();
+                    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                        if (status === 'OK' && results[0]) {
+                            setPickupAddress(results[0].formatted_address);
+                            setPickupMarker({ lat, lng });
+                            setMapCenter({ lat, lng });
+                            setShowMap(true);
+                            toast.success('Current location set ho gaya! 📍');
+                        } else {
+                            toast.error('Address nahi mila');
+                        }
+                        setGettingLocation(false);
+                    });
+                } catch (err) {
+                    toast.error('Location fetch failed');
+                    setGettingLocation(false);
+                }
+            },
+            (error) => {
+                toast.error('Location access denied. Browser settings check karo.');
+                setGettingLocation(false);
+            }
+        );
     };
 
     // Calculate Distance
@@ -98,6 +186,12 @@ export default function CreateBooking() {
                 pickupResult.lat, pickupResult.lng,
                 dropResult.lat, dropResult.lng
             );
+
+            // Set markers for map
+            setPickupMarker({ lat: pickupResult.lat, lng: pickupResult.lng });
+            setDropMarker({ lat: dropResult.lat, lng: dropResult.lng });
+            setMapCenter({ lat: pickupResult.lat, lng: pickupResult.lng });
+            setShowMap(true);
 
             setDistance({
                 value: dist,
@@ -195,14 +289,32 @@ export default function CreateBooking() {
                 dropAddress,
                 dropLat: distance.drop.lat,
                 dropLng: distance.drop.lng,
-                distanceKm: distance.value,
-                pickupDate: pickupDate || undefined,
-                pickupTime: pickupTime || undefined
+                distanceKm: distance.value
             });
 
             if (response.success) {
-                toast.success('Booking successfully ban gayi!', { id: 'create' });
-                setTimeout(() => navigate('/agent/bookings'), 1500);
+                toast.dismiss('create');
+                
+                // Sweet Alert Success
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Booking Successful!',
+                    html: `
+                        <div style="text-align: left; padding: 10px;">
+                            <p><strong>Passenger:</strong> ${passengerName}</p>
+                            <p><strong>Phone:</strong> ${passengerPhone}</p>
+                            <p><strong>Cab:</strong> ${selectedCab.name}</p>
+                            <p><strong>Fare:</strong> ₹${rideType === 'Private' ? (selectedCab.privateFare || selectedCab.fare || 0) : ((selectedCab.sharedFare || selectedCab.farePerSeat || selectedCab.fare || 0) * seatsBooked)}</p>
+                            <p><strong>Distance:</strong> ${distance.value} km</p>
+                        </div>
+                    `,
+                    confirmButtonText: 'View My Bookings',
+                    confirmButtonColor: '#2563EB',
+                    showCancelButton: false,
+                    allowOutsideClick: false
+                });
+                
+                navigate('/agent/bookings');
             } else {
                 throw new Error(response.message || 'Booking failed');
             }
@@ -226,15 +338,7 @@ export default function CreateBooking() {
 
             {/* Header */}
             <div className="max-w-4xl mx-auto mb-8">
-                <button
-                    onClick={() => navigate('/agent/bookings')}
-                    className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors mb-4 group"
-                >
-                    <div className="p-2 bg-white rounded-lg border border-gray-200 group-hover:border-blue-300 transition-all">
-                        <FaArrowLeft size={12} />
-                    </div>
-                    <span className="text-sm font-medium">Back to Bookings</span>
-                </button>
+
                 <div className="flex items-center gap-3">
                     <div className="w-1 h-8 bg-blue-600 rounded-full" />
                     <div>
@@ -321,32 +425,64 @@ export default function CreateBooking() {
                         <h2 className="text-lg font-semibold flex items-center gap-2">
                             <Navigation size={20} className="text-green-600" />
                             Trip Details
+                            {!mapsLoaded && <span className="text-xs text-orange-500">(Loading Maps...)</span>}
                         </h2>
 
                         {/* Pickup */}
                         <div className="relative">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Pickup Location</label>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-gray-700">Pickup Location</label>
+                                <button
+                                    onClick={getCurrentLocation}
+                                    disabled={gettingLocation || !mapsLoaded}
+                                    className="flex items-center gap-1 px-3 py-1 text-xs bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-all disabled:opacity-50"
+                                >
+                                    {gettingLocation ? (
+                                        <><FaSpinner className="animate-spin" size={10} />Getting...</>
+                                    ) : (
+                                        <><Navigation size={12} />Use Current Location</>
+                                    )}
+                                </button>
+                            </div>
                             <div className="relative">
                                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                                 <input
                                     type="text"
                                     value={pickupAddress}
-                                    onChange={(e) => setPickupAddress(e.target.value)}
+                                    onChange={(e) => {
+                                        setPickupAddress(e.target.value);
+                                        setShowPickupSuggestions(true);
+                                    }}
                                     onFocus={() => pickupSuggestions.length > 0 && setShowPickupSuggestions(true)}
+                                    onBlur={() => setTimeout(() => setShowPickupSuggestions(false), 200)}
                                     className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     placeholder="e.g., Lucknow Charbagh Station"
                                     autoComplete="off"
                                 />
                                 {pickupAddress && (
-                                    <button onClick={() => { setPickupAddress(''); setPickupSuggestions([]); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                    <button
+                                        onClick={() => {
+                                            setPickupAddress('');
+                                            setPickupSuggestions([]);
+                                            setShowPickupSuggestions(false);
+                                        }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
                                         <X size={16} />
                                     </button>
                                 )}
                             </div>
                             {showPickupSuggestions && pickupSuggestions.length > 0 && (
-                                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                <div
+                                    className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                >
                                     {pickupSuggestions.map((place, idx) => (
-                                        <div key={idx} className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b last:border-0" onClick={() => selectPickup(place)}>
+                                        <div
+                                            key={idx}
+                                            className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b last:border-0"
+                                            onClick={() => selectPickup(place)}
+                                        >
                                             <p className="text-sm font-medium text-gray-900">{place.mainText}</p>
                                             <p className="text-xs text-gray-500 mt-1 truncate">{place.secondaryText}</p>
                                         </div>
@@ -363,22 +499,40 @@ export default function CreateBooking() {
                                 <input
                                     type="text"
                                     value={dropAddress}
-                                    onChange={(e) => setDropAddress(e.target.value)}
+                                    onChange={(e) => {
+                                        setDropAddress(e.target.value);
+                                        setShowDropSuggestions(true);
+                                    }}
                                     onFocus={() => dropSuggestions.length > 0 && setShowDropSuggestions(true)}
+                                    onBlur={() => setTimeout(() => setShowDropSuggestions(false), 200)}
                                     className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     placeholder="e.g., Delhi Airport"
                                     autoComplete="off"
                                 />
                                 {dropAddress && (
-                                    <button onClick={() => { setDropAddress(''); setDropSuggestions([]); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                    <button
+                                        onClick={() => {
+                                            setDropAddress('');
+                                            setDropSuggestions([]);
+                                            setShowDropSuggestions(false);
+                                        }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
                                         <X size={16} />
                                     </button>
                                 )}
                             </div>
                             {showDropSuggestions && dropSuggestions.length > 0 && (
-                                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                <div
+                                    className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                >
                                     {dropSuggestions.map((place, idx) => (
-                                        <div key={idx} className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b last:border-0" onClick={() => selectDrop(place)}>
+                                        <div
+                                            key={idx}
+                                            className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b last:border-0"
+                                            onClick={() => selectDrop(place)}
+                                        >
                                             <p className="text-sm font-medium text-gray-900">{place.mainText}</p>
                                             <p className="text-xs text-gray-500 mt-1 truncate">{place.secondaryText}</p>
                                         </div>
@@ -386,6 +540,16 @@ export default function CreateBooking() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Google Map View */}
+                        {showMap && mapsLoaded && (pickupMarker || dropMarker) && (
+                            <GoogleMapView
+                                pickupMarker={pickupMarker}
+                                dropMarker={dropMarker}
+                                mapCenter={mapCenter}
+                                onClose={() => setShowMap(false)}
+                            />
+                        )}
 
                         <div className="flex gap-3">
                             <button onClick={() => setCurrentStep(1)} className="px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-all font-medium">
@@ -457,58 +621,103 @@ export default function CreateBooking() {
 
                 {/* STEP 4: Cab Selection */}
                 {currentStep === 4 && availableCabs.length > 0 && !showSeatSelection && (
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
-                        <h2 className="text-lg font-semibold flex items-center gap-2">
-                            <FaCar className="text-purple-600" />
-                            Select a Cab ({availableCabs.length} available)
-                        </h2>
+                    <div className="space-y-6">
+                        {/* Google Map with Route */}
+                        {distance && distance.pickup && distance.drop && (
+                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                                <GoogleMapView
+                                    pickupMarker={distance.pickup}
+                                    dropMarker={distance.drop}
+                                    mapCenter={distance.pickup}
+                                    onClose={() => { }}
+                                />
+                            </div>
+                        )}
 
-                        <div className="space-y-3">
-                            {availableCabs.map((cab) => {
-                                let fare = 0;
-                                let perSeatFare = 0;
+                        {/* Cab List */}
+                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
+                            <h2 className="text-lg font-semibold flex items-center gap-2">
+                                <FaCar className="text-purple-600" />
+                                Select a Cab ({availableCabs.length} available)
+                            </h2>
 
-                                if (rideType === 'Private') {
-                                    fare = cab.privateFare || cab.fare || 0;
-                                } else {
-                                    perSeatFare = cab.sharedFare || cab.farePerSeat || cab.fare || 0;
-                                    fare = perSeatFare * seatsBooked;
-                                }
+                            <div className="space-y-3">
+                                {availableCabs.map((cab) => {
+                                    let fare = 0;
+                                    let perSeatFare = 0;
 
-                                console.log('Cab:', cab.name, 'RideType:', rideType, 'privateFare:', cab.privateFare, 'sharedFare:', cab.sharedFare, 'farePerSeat:', cab.farePerSeat, 'fare:', cab.fare, 'Calculated fare:', fare);
+                                    if (rideType === 'Private') {
+                                        fare = cab.privateFare || cab.fare || 0;
+                                    } else {
+                                        perSeatFare = cab.sharedFare || cab.farePerSeat || cab.fare || 0;
+                                        fare = perSeatFare * seatsBooked;
+                                    }
 
-                                return (
-                                    <div
-                                        key={cab.carCategoryId}
-                                        onClick={() => handleCabSelect(cab)}
-                                        className="p-4 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center">
-                                                    <FaCar size={28} className="text-blue-600" />
+                                    console.log('Cab:', cab.name, 'RideType:', rideType, 'privateFare:', cab.privateFare, 'sharedFare:', cab.sharedFare, 'farePerSeat:', cab.farePerSeat, 'fare:', cab.fare, 'Calculated fare:', fare);
+
+                                    return (
+                                        <div
+                                            key={cab.carCategoryId}
+                                            onClick={() => handleCabSelect(cab)}
+                                            className="p-4 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all relative"
+                                        >
+                                            {cab.tag && (
+                                                <div className="absolute top-3 right-3 px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-md">
+                                                    {cab.tag}
                                                 </div>
-                                                <div>
-                                                    <h3 className="font-semibold text-lg">{cab.name}</h3>
-                                                    <p className="text-xs text-gray-500">{cab.description}</p>
-                                                    <p className="text-xs text-gray-600 mt-1">{cab.seatCapacity} seats</p>
+                                            )}
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center overflow-hidden">
+                                                        {cab.image ? (
+                                                            <img 
+                                                                src={cab.image} 
+                                                                alt={cab.name}
+                                                                className="w-full h-full object-cover"
+                                                                onError={(e) => {
+                                                                    e.target.style.display = 'none';
+                                                                    e.target.nextSibling.style.display = 'flex';
+                                                                }}
+                                                            />
+                                                        ) : null}
+                                                        <FaCar 
+                                                            size={28} 
+                                                            className="text-blue-600" 
+                                                            style={{ display: cab.image ? 'none' : 'block' }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-semibold text-lg">{cab.name}</h3>
+                                                        <p className="text-xs text-gray-500">{cab.description}</p>
+                                                        <div className="flex items-center gap-3 mt-2">
+                                                            <p className="text-xs text-gray-600 flex items-center gap-1">
+                                                                <Clock size={12} className="text-green-600" />
+                                                                <span className="font-medium text-green-600">{cab.arrivalMins || 'N/A'}</span>
+                                                            </p>
+                                                            <span className="text-gray-300">•</span>
+                                                            <p className="text-xs text-gray-600 flex items-center gap-1">
+                                                                <Navigation size={12} className="text-blue-600" />
+                                                                <span className="font-medium text-blue-600">{cab.dropTime || 'N/A'}</span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-2xl font-bold text-green-600">₹{fare > 0 ? fare : 'N/A'}</p>
-                                                {rideType === 'Shared' && perSeatFare > 0 && (
-                                                    <p className="text-xs text-gray-400">₹{perSeatFare} × {seatsBooked} seat(s)</p>
-                                                )}
+                                                <div className="text-right">
+                                                    <p className="text-2xl font-bold text-green-600">₹{fare > 0 ? fare : 'N/A'}</p>
+                                                    {rideType === 'Shared' && perSeatFare > 0 && (
+                                                        <p className="text-xs text-gray-400">₹{perSeatFare} × {seatsBooked} seat(s)</p>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                    );
+                                })}
+                            </div>
 
-                        <button onClick={() => setCurrentStep(3)} className="w-full py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-all font-medium">
-                            Back to Ride Type
-                        </button>
+                            <button onClick={() => setCurrentStep(3)} className="w-full py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-all font-medium">
+                                Back to Ride Type
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -555,7 +764,7 @@ export default function CreateBooking() {
                                                 }
                                             }}
                                             className={`p-3 rounded-xl text-sm font-medium transition-all ${isSelected ? 'bg-blue-600 text-white border-2 border-blue-600' :
-                                                    'bg-white text-gray-700 border-2 border-gray-300 hover:border-blue-500'
+                                                'bg-white text-gray-700 border-2 border-gray-300 hover:border-blue-500'
                                                 }`}
                                         >
                                             {seat}
@@ -593,40 +802,91 @@ export default function CreateBooking() {
                 {/* STEP 5: Schedule & Confirm */}
                 {currentStep === 5 && selectedCab && (
                     <div className="space-y-6">
+                        {/* Pickup Location Map - Zoomed */}
+                        {distance && distance.pickup && (
+                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <MapPin size={18} className="text-green-600" />
+                                    <h3 className="text-sm font-semibold text-gray-800">Pickup Location</h3>
+                                </div>
+                                <div 
+                                    className="w-full h-64 rounded-xl border-2 border-gray-200 overflow-hidden shadow-md"
+                                    ref={(el) => {
+                                        if (el && !el.dataset.initialized && window.google) {
+                                            el.dataset.initialized = 'true';
+                                            const map = new window.google.maps.Map(el, {
+                                                center: distance.pickup,
+                                                zoom: 16,
+                                                mapTypeControl: true,
+                                                streetViewControl: true,
+                                                fullscreenControl: true,
+                                            });
+
+                                            new window.google.maps.Marker({
+                                                position: distance.pickup,
+                                                map: map,
+                                                title: 'Pickup Location',
+                                                animation: window.google.maps.Animation.DROP,
+                                                icon: {
+                                                    url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
+                                                    scaledSize: new window.google.maps.Size(40, 40)
+                                                }
+                                            });
+                                        }
+                                    }}
+                                />
+                                <div className="mt-3 p-3 bg-green-50 rounded-lg">
+                                    <p className="text-xs text-gray-600 font-medium">{distance.pickupName}</p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Selected Cab Summary */}
                         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                             <h3 className="text-sm font-semibold text-gray-500 mb-3">Selected Cab</h3>
-                            <div className="flex items-center justify-between p-4 bg-purple-50 rounded-xl">
-                                <div className="flex items-center gap-3">
-                                    <FaCar size={24} className="text-purple-600" />
-                                    <div>
-                                        <p className="font-bold">{selectedCab.name}</p>
-                                        <p className="text-xs text-gray-500">{rideType} • {seatsBooked} seat(s)</p>
+                            <div className="p-4 bg-purple-50 rounded-xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center overflow-hidden">
+                                            {selectedCab.image ? (
+                                                <img 
+                                                    src={selectedCab.image} 
+                                                    alt={selectedCab.name}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                            ) : null}
+                                            <FaCar 
+                                                size={24} 
+                                                className="text-purple-600" 
+                                                style={{ display: selectedCab.image ? 'none' : 'block' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-lg">{selectedCab.name}</p>
+                                            <p className="text-xs text-gray-500">{rideType} • {seatsBooked} seat(s)</p>
+                                        </div>
                                     </div>
+                                    <p className="text-xl font-bold text-green-600">
+                                        ₹{rideType === 'Private'
+                                            ? (selectedCab.privateFare || selectedCab.fare || 0)
+                                            : ((selectedCab.sharedFare || selectedCab.farePerSeat || selectedCab.fare || 0) * seatsBooked)
+                                        }
+                                    </p>
                                 </div>
-                                <p className="text-xl font-bold text-green-600">
-                                    ₹{rideType === 'Private'
-                                        ? (selectedCab.privateFare || selectedCab.fare || 0)
-                                        : ((selectedCab.sharedFare || selectedCab.farePerSeat || selectedCab.fare || 0) * seatsBooked)
-                                    }
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Schedule */}
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
-                            <h2 className="text-lg font-semibold flex items-center gap-2">
-                                <Clock size={20} className="text-orange-600" />
-                                Schedule (Optional)
-                            </h2>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Pickup Date</label>
-                                    <input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Pickup Time</label>
-                                    <input type="time" value={pickupTime} onChange={(e) => setPickupTime(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+                                <div className="flex items-center gap-4 pt-2 border-t border-purple-200">
+                                    <div className="flex items-center gap-2">
+                                        <Clock size={14} className="text-green-600" />
+                                        <span className="text-xs font-medium text-green-600">{selectedCab.arrivalMins || 'N/A'}</span>
+                                    </div>
+                                    <span className="text-gray-300">•</span>
+                                    <div className="flex items-center gap-2">
+                                        <Navigation size={14} className="text-blue-600" />
+                                        <span className="text-xs font-medium text-blue-600">{selectedCab.dropTime || 'N/A'}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

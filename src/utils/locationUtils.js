@@ -1,78 +1,148 @@
 // src/utils/locationUtils.js
-// Google Maps API Integration
-
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const GOOGLE_MAPS_BASE = 'https://maps.googleapis.com/maps/api';
+// Google Maps API Integration with Places Autocomplete
 
 const GOOGLE_MAPS_API = {
 
-  // 📍 Address → Coordinates (Geocoding)
+  // 📍 Address → Coordinates (Geocoding) using Google Geocoder
   geocode: async (address) => {
-    try {
-      const url = `${GOOGLE_MAPS_BASE}/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}&region=in`;
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (data.status === 'OK' && data.results.length > 0) {
-        const result = data.results[0];
-        return {
-          success: true,
-          lat: result.geometry.location.lat,
-          lng: result.geometry.location.lng,
-          displayName: result.formatted_address
-        };
+    return new Promise((resolve) => {
+      if (!window.google || !window.google.maps) {
+        resolve({ success: false, error: 'Google Maps not loaded' });
+        return;
       }
-      return { success: false, error: `Location not found: ${address}` };
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
+
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode(
+        { 
+          address: address,
+          componentRestrictions: { country: 'IN' }
+        },
+        (results, status) => {
+          if (status === 'OK' && results[0]) {
+            const location = results[0].geometry.location;
+            resolve({
+              success: true,
+              lat: location.lat(),
+              lng: location.lng(),
+              displayName: results[0].formatted_address
+            });
+          } else {
+            resolve({ success: false, error: `Location not found: ${address}` });
+          }
+        }
+      );
+    });
   },
 
-  // 🔍 Address Suggestions (Autocomplete)
+  // 🔍 Get Autocomplete Service for real-time suggestions
+  getAutocompleteService: () => {
+    if (window.google && window.google.maps && window.google.maps.places) {
+      return new window.google.maps.places.AutocompleteService();
+    }
+    return null;
+  },
+
+  // 🔍 Address Suggestions (Autocomplete) using Places API
   getSuggestions: async (query) => {
-    try {
-      if (!query || query.length < 2) return [];
-
-      const url = `${GOOGLE_MAPS_BASE}/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_MAPS_API_KEY}&components=country:in`;
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (data.status === 'OK' && data.predictions) {
-        return data.predictions.map(item => ({
-          description: item.description,
-          mainText: item.structured_formatting.main_text,
-          secondaryText: item.structured_formatting.secondary_text || '',
-          placeId: item.place_id
-        }));
+    return new Promise((resolve) => {
+      if (!query || query.length < 2) {
+        resolve([]);
+        return;
       }
-      return [];
-    } catch (err) {
-      console.error('Suggestions error:', err);
-      return [];
-    }
+
+      const service = GOOGLE_MAPS_API.getAutocompleteService();
+      if (!service) {
+        console.error('❌ AutocompleteService not available');
+        resolve([]);
+        return;
+      }
+
+      console.log('🔍 Calling Google Places API for:', query);
+      service.getPlacePredictions(
+        {
+          input: query,
+          componentRestrictions: { country: 'in' },
+          types: ['geocode']
+        },
+        (predictions, status) => {
+          console.log('📡 Google API Status:', status);
+          console.log('📡 Predictions:', predictions);
+          console.log('📡 Status Code:', window.google.maps.places.PlacesServiceStatus);
+          
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+            const results = predictions.map(prediction => ({
+              description: prediction.description,
+              mainText: prediction.structured_formatting.main_text,
+              secondaryText: prediction.structured_formatting.secondary_text || '',
+              placeId: prediction.place_id
+            }));
+            console.log('✅ Formatted results:', results);
+            console.log('✅ Total results:', results.length);
+            resolve(results);
+          } else if (status === window.google.maps.places.PlacesServiceStatus.REQUEST_DENIED) {
+            console.error('❌ REQUEST_DENIED - API key invalid or API not enabled');
+            resolve([]);
+          } else if (status === window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+            console.warn('⚠️ ZERO_RESULTS - No results found');
+            resolve([]);
+          } else {
+            console.error('❌ Places API failed with status:', status);
+            resolve([]);
+          }
+        }
+      );
+    });
   },
 
-  // 📏 Distance using Google Distance Matrix API
+  // 📏 Distance using Google Distance Matrix Service
   getDistance: async (lat1, lng1, lat2, lng2) => {
-    try {
-      const origin = `${lat1},${lng1}`;
-      const destination = `${lat2},${lng2}`;
-      const url = `${GOOGLE_MAPS_BASE}/distancematrix/json?origins=${origin}&destinations=${destination}&key=${GOOGLE_MAPS_API_KEY}`;
-      
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (data.status === 'OK' && data.rows[0].elements[0].status === 'OK') {
-        const distanceInMeters = data.rows[0].elements[0].distance.value;
-        return parseFloat((distanceInMeters / 1000).toFixed(2)); // Convert to km
+    return new Promise((resolve) => {
+      if (!window.google || !window.google.maps) {
+        resolve(calculateHaversineDistance(lat1, lng1, lat2, lng2));
+        return;
       }
-      
-      // Fallback to Haversine if API fails
-      return calculateHaversineDistance(lat1, lng1, lat2, lng2);
-    } catch (err) {
-      console.error('Distance API error:', err);
-      return calculateHaversineDistance(lat1, lng1, lat2, lng2);
-    }
+
+      const service = new window.google.maps.DistanceMatrixService();
+      const origin = new window.google.maps.LatLng(lat1, lng1);
+      const destination = new window.google.maps.LatLng(lat2, lng2);
+
+      service.getDistanceMatrix(
+        {
+          origins: [origin],
+          destinations: [destination],
+          travelMode: 'DRIVING',
+          unitSystem: window.google.maps.UnitSystem.METRIC
+        },
+        (response, status) => {
+          if (status === 'OK' && response.rows[0].elements[0].status === 'OK') {
+            const distanceInMeters = response.rows[0].elements[0].distance.value;
+            resolve(parseFloat((distanceInMeters / 1000).toFixed(2)));
+          } else {
+            resolve(calculateHaversineDistance(lat1, lng1, lat2, lng2));
+          }
+        }
+      );
+    });
+  },
+
+  // Check if Google Maps is loaded
+  isLoaded: () => {
+    const loaded = !!(window.google && window.google.maps && window.google.maps.places);
+    console.log('🔍 Google Maps isLoaded check:', loaded);
+    return loaded;
+  },
+
+  // Wait for Google Maps to load
+  waitForLoad: () => {
+    return new Promise((resolve) => {
+      if (GOOGLE_MAPS_API.isLoaded()) {
+        resolve(true);
+        return;
+      }
+      window.addEventListener('google-maps-loaded', () => resolve(true), { once: true });
+      // Timeout after 10 seconds
+      setTimeout(() => resolve(false), 10000);
+    });
   }
 };
 

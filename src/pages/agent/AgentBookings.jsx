@@ -83,7 +83,7 @@ export default function AgentBookings() {
       </div>
 
       {/* Booking Table */}
-      <BookingTable bookings={bookings} loading={loading} />
+      <BookingTable bookings={bookings} loading={loading} onRefresh={fetchBookings} />
     </div>
   );
 }
