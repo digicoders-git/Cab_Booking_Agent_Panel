@@ -19,6 +19,12 @@ agentApi.interceptors.request.use((config) => {
 // ✅ SAB FUNCTIONS EK OBJECT ME
 export const agentService = {
 
+  // 🔐 Login
+  login: async (email, password) => {
+    const response = await agentApi.post('/api/agents/login', { email, password });
+    return response.data;
+  },
+
   // Profile
   getProfile: async () => {
     const response = await agentApi.get('/api/agents/profile');

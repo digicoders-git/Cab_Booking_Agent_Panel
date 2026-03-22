@@ -16,14 +16,21 @@ export default function AgentLogin() {
     e.preventDefault();
     setLoading(true);
     try {
+      console.log('🔑 Login attempt:', { email });
       const res = await agentService.login(email, password);
+      console.log('✅ Login response:', res);
+      
       if (res.success) {
         setLoginData({ ...res.agent, token: res.token });
         toast.success('Login successful!');
         navigate('/agent/dashboard');
+      } else {
+        toast.error(res.message || 'Login failed');
       }
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Login failed');
+      console.error('❌ Login error:', err);
+      console.error('❌ Error response:', err?.response?.data);
+      toast.error(err?.response?.data?.message || err?.message || 'Login failed');
     } finally {
       setLoading(false);
     }

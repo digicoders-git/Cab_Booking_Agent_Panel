@@ -89,7 +89,21 @@ const ProfileCard = ({ profile }) => {
     <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-all">
       <div className="flex items-start gap-4 mb-6">
         <div className="relative">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg">
+          {profile.image ? (
+            <img 
+              src={profile.image} 
+              alt={profile.name}
+              className="w-20 h-20 rounded-2xl object-cover shadow-lg"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+            />
+          ) : null}
+          <div 
+            className="w-20 h-20 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg"
+            style={{ display: profile.image ? 'none' : 'flex' }}
+          >
             {profile.name?.charAt(0) || 'A'}
           </div>
           <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white"></div>

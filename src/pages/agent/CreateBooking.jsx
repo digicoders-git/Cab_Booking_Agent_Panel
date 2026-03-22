@@ -118,12 +118,37 @@ export default function CreateBooking() {
         setPickupAddress(place.description);
         setPickupSuggestions([]);
         setShowPickupSuggestions(false);
+        
+        // Geocode pickup and set marker
+        GOOGLE_MAPS_API.geocode(place.description).then(result => {
+            if (result.success) {
+                setPickupMarker({ lat: result.lat, lng: result.lng });
+                setMapCenter({ lat: result.lat, lng: result.lng });
+                
+                // If drop is already selected, show map
+                if (dropMarker) {
+                    setShowMap(true);
+                }
+            }
+        });
     };
 
     const selectDrop = (place) => {
         setDropAddress(place.description);
         setDropSuggestions([]);
         setShowDropSuggestions(false);
+        
+        // Geocode drop and set marker
+        GOOGLE_MAPS_API.geocode(place.description).then(result => {
+            if (result.success) {
+                setDropMarker({ lat: result.lat, lng: result.lng });
+                
+                // If pickup is already selected, show map
+                if (pickupMarker) {
+                    setShowMap(true);
+                }
+            }
+        });
     };
 
     // Get Current Location
@@ -389,9 +414,16 @@ export default function CreateBooking() {
                                 <input
                                     type="text"
                                     value={passengerName}
-                                    onChange={(e) => setPassengerName(e.target.value)}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        // Only allow letters and spaces
+                                        if (/^[a-zA-Z\s]*$/.test(value)) {
+                                            setPassengerName(value);
+                                        }
+                                    }}
                                     className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     placeholder="e.g., Rahul Kumar"
+                                    maxLength={50}
                                 />
                             </div>
                             <div>
@@ -399,16 +431,43 @@ export default function CreateBooking() {
                                 <input
                                     type="tel"
                                     value={passengerPhone}
-                                    onChange={(e) => setPassengerPhone(e.target.value)}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        // Only allow numbers and max 10 digits
+                                        if (/^[0-9]{0,10}$/.test(value)) {
+                                            setPassengerPhone(value);
+                                        }
+                                    }}
                                     className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                     placeholder="e.g., 9876543210"
+                                    maxLength={10}
                                 />
+                                {passengerPhone && passengerPhone.length < 10 && (
+                                    <p className="text-xs text-orange-500 mt-1">{10 - passengerPhone.length} digits aur chahiye</p>
+                                )}
+                                {passengerPhone && passengerPhone.length === 10 && (
+                                    <p className="text-xs text-green-600 mt-1">✓ Valid phone number</p>
+                                )}
                             </div>
                         </div>
                         <button
                             onClick={() => {
-                                if (!passengerName.trim() || !passengerPhone.trim()) {
-                                    return toast.error('Name aur Phone dono bharo');
+                                // Validation
+                                if (!passengerName.trim()) {
+                                    toast.error('Passenger name zaruri hai!');
+                                    return;
+                                }
+                                if (passengerName.trim().length < 3) {
+                                    toast.error('Name kam se kam 3 characters ka hona chahiye!');
+                                    return;
+                                }
+                                if (!passengerPhone.trim()) {
+                                    toast.error('Phone number zaruri hai!');
+                                    return;
+                                }
+                                if (!/^[0-9]{10}$/.test(passengerPhone.trim())) {
+                                    toast.error('Valid 10 digit phone number enter karo!');
+                                    return;
                                 }
                                 setCurrentStep(2);
                             }}
