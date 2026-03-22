@@ -6,7 +6,9 @@ import { FaArrowLeft, FaHeadset, FaPaperPlane, FaSpinner } from 'react-icons/fa'
 import { MessageCircle, Mail, Phone, HelpCircle } from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
+console.log('🔗 Support API URL:', API_BASE_URL);
 
 export default function Support() {
   const navigate = useNavigate();
