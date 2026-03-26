@@ -4,12 +4,15 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import { FontProvider } from './context/FontContext.jsx'
+import { SocketProvider } from './context/SocketContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <AuthProvider>
     <ThemeProvider>
       <FontProvider>
-        <App />
+        <SocketProvider>
+          <App />
+        </SocketProvider>
       </FontProvider>
     </ThemeProvider>
   </AuthProvider>,

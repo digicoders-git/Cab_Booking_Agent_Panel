@@ -2,12 +2,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { agentService } from '../../api/agentApi';
+import { useSocket } from '../../context/SocketContext';
 import { toast } from 'sonner';
 import { FaSync, FaPlusCircle, FaArrowLeft } from 'react-icons/fa';
 import BookingTable from '../../components/BookingTable';
 
 export default function AgentBookings() {
   const navigate = useNavigate();
+  const { socket, connected } = useSocket();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,6 +26,38 @@ export default function AgentBookings() {
   };
 
   useEffect(() => { fetchBookings(); }, []);
+
+  // Real-time booking updates
+  useEffect(() => {
+    const handleBookingUpdate = (event) => {
+      const data = event.detail;
+      console.log('📢 Real-time booking update received:', data);
+      
+      // Update booking in list
+      setBookings(prevBookings => {
+        return prevBookings.map(booking => {
+          if (booking._id === data.bookingId) {
+            return {
+              ...booking,
+              bookingStatus: data.status,
+              assignedDriver: data.driverName ? {
+                name: data.driverName,
+                phone: data.driverPhone
+              } : booking.assignedDriver
+            };
+          }
+          return booking;
+        });
+      });
+    };
+
+    // Listen for custom event
+    window.addEventListener('booking_update', handleBookingUpdate);
+
+    return () => {
+      window.removeEventListener('booking_update', handleBookingUpdate);
+    };
+  }, []);
 
   const stats = useMemo(() => ({
     total:     bookings.length,
@@ -45,7 +79,10 @@ export default function AgentBookings() {
             <div className="w-1 h-8 bg-blue-600 rounded-full" />
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">My Bookings</h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{stats.total} total • Click row to expand details</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                {stats.total} total • Click row to expand details
+                {connected && <span className="ml-2 text-green-600">• 🟢 Live</span>}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">

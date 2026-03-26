@@ -185,8 +185,50 @@ export default function CreateBooking() {
                 }
             },
             (error) => {
-                toast.error('Location access denied. Browser settings check karo.');
                 setGettingLocation(false);
+                
+                // Better error messages based on error code
+                if (error.code === 1) {
+                    // Permission denied
+                    Swal.fire({
+                        icon: 'warning',
+                        title: '📍 Location Permission Blocked',
+                        html: `
+                            <div style="text-align: left; padding: 15px; font-size: 14px;">
+                                <p style="margin-bottom: 15px; color: #dc2626; font-weight: 600;">
+                                    ⚠️ Location permission has been blocked!
+                                </p>
+                                
+                                <p style="margin-bottom: 10px; font-weight: 600; color: #1f2937;">
+                                    🔧 How to Fix (Chrome/Edge):
+                                </p>
+                                <ol style="margin-left: 20px; line-height: 2; color: #374151;">
+                                    <li>Click the <strong>🔒 lock icon</strong> (or tune icon) in address bar</li>
+                                    <li>Click <strong>"Site Settings"</strong></li>
+                                    <li>Find <strong>"Location"</strong> permission</li>
+                                    <li>Change from <strong>"Block"</strong> to <strong>"Ask" or "Allow"</strong></li>
+                                    <li>Close settings and <strong>refresh page (F5)</strong></li>
+                                    <li>Click <strong>"Use Current Location"</strong> button again</li>
+                                </ol>
+                                
+                                <div style="margin-top: 15px; padding: 10px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+                                    <p style="margin: 0; font-size: 12px; color: #92400e;">
+                                        <strong>💡 Tip:</strong> Ya phir manually pickup address type kar sakte ho!
+                                    </p>
+                                </div>
+                            </div>
+                        `,
+                        confirmButtonText: 'OK, I\'ll Fix It!',
+                        confirmButtonColor: '#2563EB',
+                        width: '600px'
+                    });
+                } else if (error.code === 2) {
+                    toast.error('Location unavailable. GPS band ho sakta hai.');
+                } else if (error.code === 3) {
+                    toast.error('Location request timeout. Phir se try karo.');
+                } else {
+                    toast.error('Location fetch failed. Manually address enter karo.');
+                }
             }
         );
     };
