@@ -6,6 +6,7 @@ import { useSocket } from '../../context/SocketContext';
 import { toast } from 'sonner';
 import { FaSync, FaPlusCircle, FaArrowLeft } from 'react-icons/fa';
 import BookingTable from '../../components/BookingTable';
+import LiveLocationMonitor from '../../components/LiveLocationMonitor';
 
 export default function AgentBookings() {
   const navigate = useNavigate();
@@ -17,7 +18,20 @@ export default function AgentBookings() {
     try {
       setLoading(true);
       const data = await agentService.getMyBookings();
-      setBookings(data?.bookings || data || []);
+      const bookingsList = data?.bookings || data || [];
+      
+      console.log('📦 Fetched Bookings from API:', {
+        count: bookingsList.length,
+        bookings: bookingsList.map(b => ({
+          id: b._id?.slice(-8),
+          passenger: b.passengerDetails?.name,
+          status: b.bookingStatus,
+          driverLocation: b.driverLocation,
+          assignedDriver: b.assignedDriver
+        }))
+      });
+      
+      setBookings(bookingsList);
     } catch (err) {
       toast.error(err?.message || 'Failed to load bookings');
     } finally {
@@ -41,6 +55,7 @@ export default function AgentBookings() {
               ...booking,
               bookingStatus: data.status,
               assignedDriver: data.driverName ? {
+                ...booking.assignedDriver,
                 name: data.driverName,
                 phone: data.driverPhone
               } : booking.assignedDriver
@@ -51,11 +66,57 @@ export default function AgentBookings() {
       });
     };
 
-    // Listen for custom event
+    const handleLocationUpdate = (event) => {
+      const data = event.detail;
+      console.log('🚗 AgentBookings: Driver Location Update Received:', data);
+      
+      setBookings(prevBookings => {
+        const updated = prevBookings.map(booking => {
+          // Check if this booking belongs to this driver and is active
+          const driverId = typeof booking.assignedDriver === 'object' 
+            ? booking.assignedDriver?._id 
+            : booking.assignedDriver;
+
+          console.log('🔍 Checking booking:', {
+            bookingId: booking._id?.slice(-8),
+            driverId,
+            incomingDriverId: data.driverId,
+            status: booking.bookingStatus,
+            match: driverId === data.driverId
+          });
+
+          if (driverId === data.driverId && 
+              booking.bookingStatus && 
+              ['accepted', 'ongoing'].includes(booking.bookingStatus.toLowerCase())) {
+            
+            console.log('✅ MATCH! Updating booking:', booking._id?.slice(-8));
+            console.log('📍 New Location:', { lat: data.latitude, lng: data.longitude });
+            
+            return {
+              ...booking,
+              driverLocation: {
+                latitude: data.latitude,
+                longitude: data.longitude,
+                heading: data.heading,
+                lastUpdated: data.timestamp
+              }
+            };
+          }
+          return booking;
+        });
+        
+        console.log('📦 Updated Bookings State:', updated);
+        return updated;
+      });
+    };
+
+    // Listen for custom events
     window.addEventListener('booking_update', handleBookingUpdate);
+    window.addEventListener('driver_location_update', handleLocationUpdate);
 
     return () => {
       window.removeEventListener('booking_update', handleBookingUpdate);
+      window.removeEventListener('driver_location_update', handleLocationUpdate);
     };
   }, []);
 
@@ -121,6 +182,9 @@ export default function AgentBookings() {
 
       {/* Booking Table */}
       <BookingTable bookings={bookings} loading={loading} onRefresh={fetchBookings} />
+
+      {/* Live Location Monitor - Floating Button */}
+      <LiveLocationMonitor />
     </div>
   );
 }

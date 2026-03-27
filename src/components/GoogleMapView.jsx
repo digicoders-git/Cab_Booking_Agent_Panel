@@ -4,28 +4,46 @@ import { X, MapPin, Navigation } from 'lucide-react';
 export default function GoogleMapView({ pickupMarker, dropMarker, mapCenter, onClose }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
+    const directionsRendererRef = useRef(null);
 
     useEffect(() => {
-        if (!mapRef.current || !window.google || mapInstanceRef.current) return;
+        if (!mapRef.current || !window.google) return;
 
-        const map = new window.google.maps.Map(mapRef.current, {
-            center: mapCenter,
-            zoom: 13,
-            mapTypeControl: true,
-            streetViewControl: false,
-            fullscreenControl: true,
-        });
+        console.log('🗺️ GoogleMapView: Rendering map with:', { pickupMarker, dropMarker });
 
-        mapInstanceRef.current = map;
+        // Clear previous directions renderer
+        if (directionsRendererRef.current) {
+            directionsRendererRef.current.setMap(null);
+            directionsRendererRef.current = null;
+        }
+
+        // Create or reuse map instance
+        if (!mapInstanceRef.current) {
+            const map = new window.google.maps.Map(mapRef.current, {
+                center: mapCenter,
+                zoom: 13,
+                mapTypeControl: true,
+                streetViewControl: false,
+                fullscreenControl: true,
+            });
+            mapInstanceRef.current = map;
+        }
+
+        const map = mapInstanceRef.current;
+
+        // Clear existing markers (if any)
+        // Note: In production, you'd want to store marker refs and clear them
+        // For now, we'll just create new ones
 
         if (pickupMarker) {
             new window.google.maps.Marker({
                 position: pickupMarker,
                 map: map,
                 title: 'Pickup Location',
-                label: 'P',
+                label: { text: 'P', color: 'white', fontWeight: 'bold' },
                 icon: {
-                    url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                    url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
+                    scaledSize: new window.google.maps.Size(40, 40)
                 }
             });
         }
@@ -35,13 +53,17 @@ export default function GoogleMapView({ pickupMarker, dropMarker, mapCenter, onC
                 position: dropMarker,
                 map: map,
                 title: 'Drop Location',
-                label: 'D',
+                label: { text: 'D', color: 'white', fontWeight: 'bold' },
                 icon: {
-                    url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                    url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
+                    scaledSize: new window.google.maps.Size(40, 40)
                 }
             });
 
+            // Draw route if both markers exist
             if (pickupMarker) {
+                console.log('🛣️ Drawing route from pickup to drop');
+                
                 const directionsService = new window.google.maps.DirectionsService();
                 const directionsRenderer = new window.google.maps.DirectionsRenderer({
                     map: map,
@@ -53,6 +75,8 @@ export default function GoogleMapView({ pickupMarker, dropMarker, mapCenter, onC
                     }
                 });
 
+                directionsRendererRef.current = directionsRenderer;
+
                 directionsService.route(
                     {
                         origin: pickupMarker,
@@ -61,18 +85,28 @@ export default function GoogleMapView({ pickupMarker, dropMarker, mapCenter, onC
                     },
                     (result, status) => {
                         if (status === 'OK') {
+                            console.log('✅ Route drawn successfully');
                             directionsRenderer.setDirections(result);
+                        } else {
+                            console.error('❌ Route drawing failed:', status);
                         }
                     }
                 );
             }
         }
 
+        // Fit bounds to show both markers
         if (pickupMarker && dropMarker) {
             const bounds = new window.google.maps.LatLngBounds();
             bounds.extend(pickupMarker);
             bounds.extend(dropMarker);
             map.fitBounds(bounds);
+        } else if (pickupMarker) {
+            map.setCenter(pickupMarker);
+            map.setZoom(15);
+        } else if (dropMarker) {
+            map.setCenter(dropMarker);
+            map.setZoom(15);
         }
 
     }, [pickupMarker, dropMarker, mapCenter]);

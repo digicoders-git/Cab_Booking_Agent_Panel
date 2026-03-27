@@ -1,9 +1,422 @@
 // src/components/BookingTable.jsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { FaChevronDown, FaChevronUp, FaSearch, FaTimes, FaSync, FaBan, FaMapMarkedAlt } from 'react-icons/fa';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Phone, MapPin } from 'lucide-react';
 import { agentService } from '../api/agentApi';
 import { toast } from 'sonner';
+
+// --- LIVE MAP COMPONENT ---
+const LiveMapModalContent = ({ booking, mapType }) => {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const driverMarkerRef = useRef(null);
+  const infoWindowRef = useRef(null);
+  const directionsRendererRef = useRef(null); // ✅ Store DirectionsRenderer
+  const [liveDriverLocation, setLiveDriverLocation] = useState(null); // 🔴 NEW: Live location state
+
+  // 🔴 NEW: Listen to real-time location updates
+  useEffect(() => {
+    const handleLiveLocationUpdate = (event) => {
+      const data = event.detail;
+      const driverId = typeof booking.assignedDriver === 'object' 
+        ? booking.assignedDriver?._id 
+        : booking.assignedDriver;
+
+      console.log('🗺️ LiveMapModalContent: Checking location update:', {
+        incomingDriverId: data.driverId,
+        bookingDriverId: driverId,
+        match: data.driverId === driverId,
+        bookingStatus: booking.bookingStatus
+      });
+
+      // Only update if this is the correct driver for this booking
+      if (data.driverId === driverId) {
+        console.log('✅ MATCH! Updating live location in map:', {
+          lat: data.latitude,
+          lng: data.longitude,
+          heading: data.heading
+        });
+        setLiveDriverLocation({
+          latitude: data.latitude,
+          longitude: data.longitude,
+          heading: data.heading,
+          timestamp: data.timestamp
+        });
+      }
+    };
+
+    window.addEventListener('driver_location_update', handleLiveLocationUpdate);
+
+    return () => {
+      window.removeEventListener('driver_location_update', handleLiveLocationUpdate);
+    };
+  }, [booking.assignedDriver, booking._id]);
+
+  // 1. Initial Map Setup
+  useEffect(() => {
+    if (!mapRef.current || !window.google) return;
+
+    const pickupLat = booking.pickup?.latitude || booking.pickup?.lat;
+    const pickupLng = booking.pickup?.longitude || booking.pickup?.lng;
+    const dropLat = booking.drop?.latitude || booking.drop?.lat;
+    const dropLng = booking.drop?.longitude || booking.drop?.lng;
+    const driverLat = booking.driverLocation?.latitude || booking.driverLocation?.lat || pickupLat;
+    const driverLng = booking.driverLocation?.longitude || booking.driverLocation?.lng || pickupLng;
+    const status = booking.bookingStatus?.toLowerCase();
+
+    const map = new window.google.maps.Map(mapRef.current, {
+      center: { lat: pickupLat, lng: pickupLng },
+      zoom: 14,
+      mapTypeControl: true,
+      streetViewControl: true,
+      fullscreenControl: true,
+    });
+    mapInstanceRef.current = map;
+
+    if (mapType === 'route') {
+      // Setup Markers for Route
+      if (pickupLat && pickupLng) {
+        new window.google.maps.Marker({
+          position: { lat: pickupLat, lng: pickupLng },
+          map: map,
+          title: 'Pickup',
+          label: { text: 'P', color: 'white', fontWeight: 'bold' },
+          icon: { url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png', scaledSize: new window.google.maps.Size(50, 50) }
+        });
+      }
+
+      if (dropLat && dropLng) {
+        new window.google.maps.Marker({
+          position: { lat: dropLat, lng: dropLng },
+          map: map,
+          title: 'Drop',
+          label: { text: 'D', color: 'white', fontWeight: 'bold' },
+          icon: { url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png', scaledSize: new window.google.maps.Size(50, 50) }
+        });
+      }
+
+      // Driver Marker with Custom Car Icon
+      const driverName = typeof booking.assignedDriver === 'object' 
+        ? booking.assignedDriver?.name 
+        : booking.assignedDriver || 'Driver';
+      
+      // Custom car icon SVG - Better visibility
+      const carIconSvg = `
+        <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <!-- Shadow -->
+          <ellipse cx="24" cy="42" rx="16" ry="3" fill="rgba(0,0,0,0.2)"/>
+          <!-- Car Body -->
+          <path d="M12 28 L12 32 C12 33 13 34 14 34 L16 34 C17 34 18 33 18 32 L18 30 L30 30 L30 32 C30 33 31 34 32 34 L34 34 C35 34 36 33 36 32 L36 28 L38 28 C39 28 40 27 40 26 L40 20 C40 19 39.5 18 38.5 17 L35 12 C34.5 11 33.5 10 32 10 L16 10 C14.5 10 13.5 11 13 12 L9.5 17 C8.5 18 8 19 8 20 L8 26 C8 27 9 28 10 28 L12 28 Z" fill="#3B82F6" stroke="#1E40AF" stroke-width="1.5"/>
+          <!-- Windows -->
+          <path d="M14 16 L18 12 L30 12 L34 16 L34 20 L14 20 Z" fill="#93C5FD" stroke="#1E40AF" stroke-width="1"/>
+          <!-- Windshield divider -->
+          <line x1="24" y1="12" x2="24" y2="20" stroke="#1E40AF" stroke-width="1.5"/>
+          <!-- Headlights -->
+          <circle cx="12" cy="24" r="2" fill="#FCD34D"/>
+          <circle cx="36" cy="24" r="2" fill="#FCD34D"/>
+          <!-- Wheels -->
+          <circle cx="14" cy="30" r="3" fill="#1F2937" stroke="#000" stroke-width="1"/>
+          <circle cx="34" cy="30" r="3" fill="#1F2937" stroke="#000" stroke-width="1"/>
+          <!-- Wheel centers -->
+          <circle cx="14" cy="30" r="1.5" fill="#6B7280"/>
+          <circle cx="34" cy="30" r="1.5" fill="#6B7280"/>
+        </svg>
+      `;
+      
+      const carIconUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(carIconSvg);
+
+      const driverMarker = new window.google.maps.Marker({
+        position: { lat: driverLat, lng: driverLng },
+        map: map,
+        title: `Driver: ${driverName}`,
+        icon: { 
+          url: carIconUrl,
+          scaledSize: new window.google.maps.Size(48, 48),
+          anchor: new window.google.maps.Point(24, 24) // Center the icon
+        },
+        zIndex: 1000,
+        animation: window.google.maps.Animation.DROP
+      });
+      driverMarkerRef.current = driverMarker;
+
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: `
+          <div style="padding: 8px; min-width: 150px;">
+            <p style="font-weight: bold; margin: 0 0 4px 0; color: #1F2937;">🚗 ${driverName}</p>
+            <p style="margin: 0; font-size: 11px; color: #6B7280;">Live Location</p>
+          </div>
+        `
+      });
+      infoWindowRef.current = infoWindow;
+      driverMarker.addListener('click', () => infoWindow.open(map, driverMarker));
+
+      // ✅ ROUTE LINE DRAWING - Based on Status
+      const directionsService = new window.google.maps.DirectionsService();
+      
+      // Clear previous renderer if exists
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+      }
+      
+      if (status === 'accepted') {
+        // 🟢 ACCEPTED: Driver → Pickup (Green Line)
+        console.log('🟢 Drawing ACCEPTED route: Driver → Pickup');
+        const directionsRenderer = new window.google.maps.DirectionsRenderer({
+          map: map,
+          suppressMarkers: true, // Hide default markers
+          polylineOptions: { 
+            strokeColor: '#10B981', // Green color
+            strokeWeight: 5, 
+            strokeOpacity: 0.8 
+          },
+          preserveViewport: false // Allow auto-zoom to route
+        });
+        directionsRendererRef.current = directionsRenderer; // Store in ref
+
+        directionsService.route({
+          origin: { lat: driverLat, lng: driverLng },
+          destination: { lat: pickupLat, lng: pickupLng },
+          travelMode: window.google.maps.TravelMode.DRIVING
+        }, (result, status) => { 
+          if (status === 'OK') {
+            directionsRenderer.setDirections(result);
+            console.log('✅ ACCEPTED route drawn successfully!');
+          } else {
+            console.error('❌ ACCEPTED route failed:', status);
+          }
+        });
+
+      } else if (status === 'ongoing') {
+        // 🔵 ONGOING: Driver → Drop (Blue Line)
+        console.log('🔵 Drawing ONGOING route: Driver → Drop');
+        const directionsRenderer = new window.google.maps.DirectionsRenderer({
+          map: map,
+          suppressMarkers: true, // Hide default markers
+          polylineOptions: { 
+            strokeColor: '#3B82F6', // Blue color
+            strokeWeight: 5, 
+            strokeOpacity: 0.8 
+          },
+          preserveViewport: false
+        });
+        directionsRendererRef.current = directionsRenderer; // Store in ref
+
+        directionsService.route({
+          origin: { lat: driverLat, lng: driverLng },
+          destination: { lat: dropLat, lng: dropLng },
+          travelMode: window.google.maps.TravelMode.DRIVING
+        }, (result, status) => { 
+          if (status === 'OK') {
+            directionsRenderer.setDirections(result);
+            console.log('✅ ONGOING route drawn successfully!');
+          } else {
+            console.error('❌ ONGOING route failed:', status);
+          }
+        });
+
+      } else if (status === 'completed') {
+        // ⚪ COMPLETED: Pickup → Drop (Gray Line) - Full route
+        console.log('⚪ Drawing COMPLETED route: Pickup → Drop');
+        const directionsRenderer = new window.google.maps.DirectionsRenderer({
+          map: map,
+          suppressMarkers: true,
+          polylineOptions: { 
+            strokeColor: '#6B7280', // Gray color
+            strokeWeight: 4, 
+            strokeOpacity: 0.6 
+          },
+          preserveViewport: false
+        });
+        directionsRendererRef.current = directionsRenderer; // Store in ref
+
+        directionsService.route({
+          origin: { lat: pickupLat, lng: pickupLng },
+          destination: { lat: dropLat, lng: dropLng },
+          travelMode: window.google.maps.TravelMode.DRIVING
+        }, (result, status) => { 
+          if (status === 'OK') {
+            directionsRenderer.setDirections(result);
+            console.log('✅ COMPLETED route drawn successfully!');
+          } else {
+            console.error('❌ COMPLETED route failed:', status);
+          }
+        });
+      }
+
+      // Auto-fit bounds only if no route is being drawn
+      if (!['accepted', 'ongoing', 'completed'].includes(status)) {
+        const bounds = new window.google.maps.LatLngBounds();
+        if (pickupLat && pickupLng) bounds.extend({ lat: pickupLat, lng: pickupLng });
+        if (dropLat && dropLng) bounds.extend({ lat: dropLat, lng: dropLng });
+        bounds.extend({ lat: driverLat, lng: driverLng });
+        map.fitBounds(bounds);
+      }
+
+    } else if (mapType === 'pickup' && pickupLat && pickupLng) {
+      new window.google.maps.Marker({
+        position: { lat: pickupLat, lng: pickupLng },
+        map: map,
+        animation: window.google.maps.Animation.BOUNCE,
+        icon: { url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png', scaledSize: new window.google.maps.Size(50, 50) }
+      });
+      map.setCenter({ lat: pickupLat, lng: pickupLng });
+      map.setZoom(16);
+    } else if (mapType === 'drop' && dropLat && dropLng) {
+      new window.google.maps.Marker({
+        position: { lat: dropLat, lng: dropLng },
+        map: map,
+        animation: window.google.maps.Animation.BOUNCE,
+        icon: { url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png', scaledSize: new window.google.maps.Size(50, 50) }
+      });
+      map.setCenter({ lat: dropLat, lng: dropLng });
+      map.setZoom(16);
+    }
+
+    // Cleanup function
+    return () => {
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+        directionsRendererRef.current = null;
+      }
+      if (driverMarkerRef.current) {
+        driverMarkerRef.current.setMap(null);
+        driverMarkerRef.current = null;
+      }
+      if (infoWindowRef.current) {
+        infoWindowRef.current.close();
+        infoWindowRef.current = null;
+      }
+    };
+
+  }, [mapType, booking._id, booking.bookingStatus]);
+
+  // 2. Real-time Position Update - Using liveDriverLocation state
+  useEffect(() => {
+    console.log('🔍 LiveMapModalContent: Live location state changed:', {
+      bookingId: booking._id?.slice(-8),
+      hasMarker: !!driverMarkerRef.current,
+      hasGoogle: !!window.google,
+      mapType,
+      liveDriverLocation,
+      bookingStatus: booking.bookingStatus
+    });
+
+    if (!driverMarkerRef.current || !window.google || mapType !== 'route') {
+      console.log('⚠️ Map Update Skipped:', {
+        hasMarker: !!driverMarkerRef.current,
+        hasGoogle: !!window.google,
+        mapType,
+        reason: !driverMarkerRef.current ? 'No marker' : !window.google ? 'No Google' : mapType !== 'route' ? 'Wrong map type' : 'Unknown'
+      });
+      return;
+    }
+    
+    // Use live location if available, otherwise use booking location
+    const lat = liveDriverLocation?.latitude || booking.driverLocation?.latitude || booking.driverLocation?.lat;
+    const lng = liveDriverLocation?.longitude || booking.driverLocation?.longitude || booking.driverLocation?.lng;
+    const status = booking.bookingStatus?.toLowerCase();
+    
+    console.log('🗺️ LiveMapModalContent: Attempting to update marker:', {
+      bookingId: booking._id?.slice(-8),
+      lat,
+      lng,
+      status,
+      isLiveUpdate: !!liveDriverLocation,
+      hasMarker: !!driverMarkerRef.current,
+      hasRenderer: !!directionsRendererRef.current
+    });
+    
+    if (lat && lng) {
+      console.log('✅ Updating Driver Marker on Map:', { lat, lng, isLive: !!liveDriverLocation });
+      const newPos = new window.google.maps.LatLng(lat, lng);
+      
+      // 🎬 Smooth marker animation
+      if (liveDriverLocation) {
+        // Animate marker movement for live updates
+        const currentPos = driverMarkerRef.current.getPosition();
+        if (currentPos) {
+          // Smooth transition
+          driverMarkerRef.current.setPosition(newPos);
+          // Optional: Add bounce animation for new update
+          driverMarkerRef.current.setAnimation(window.google.maps.Animation.BOUNCE);
+          setTimeout(() => {
+            driverMarkerRef.current.setAnimation(null);
+          }, 700);
+        } else {
+          driverMarkerRef.current.setPosition(newPos);
+        }
+      } else {
+        driverMarkerRef.current.setPosition(newPos);
+      }
+      
+      // 🔄 Update route line based on status
+      if (directionsRendererRef.current && mapInstanceRef.current) {
+        const pickupLat = booking.pickup?.latitude || booking.pickup?.lat;
+        const pickupLng = booking.pickup?.longitude || booking.pickup?.lng;
+        const dropLat = booking.drop?.latitude || booking.drop?.lat;
+        const dropLng = booking.drop?.longitude || booking.drop?.lng;
+
+        const directionsService = new window.google.maps.DirectionsService();
+        
+        if (status === 'accepted' && pickupLat && pickupLng) {
+          // Update route: Driver → Pickup
+          console.log('🔄 Updating ACCEPTED route with new driver position');
+          directionsService.route({
+            origin: newPos,
+            destination: { lat: pickupLat, lng: pickupLng },
+            travelMode: window.google.maps.TravelMode.DRIVING
+          }, (result, status) => { 
+            if (status === 'OK') {
+              directionsRendererRef.current.setDirections(result);
+              console.log('✅ ACCEPTED route updated!');
+            }
+          });
+        } else if (status === 'ongoing' && dropLat && dropLng) {
+          // Update route: Driver → Drop
+          console.log('🔄 Updating ONGOING route with new driver position');
+          directionsService.route({
+            origin: newPos,
+            destination: { lat: dropLat, lng: dropLng },
+            travelMode: window.google.maps.TravelMode.DRIVING
+          }, (result, status) => { 
+            if (status === 'OK') {
+              directionsRendererRef.current.setDirections(result);
+              console.log('✅ ONGOING route updated!');
+            }
+          });
+        }
+      }
+      
+      // 🎯 Optional: Center map on driver for live updates
+      if (liveDriverLocation && mapInstanceRef.current) {
+        mapInstanceRef.current.panTo(newPos);
+      }
+    } else {
+      console.log('❌ No valid coordinates to update marker');
+    }
+  }, [liveDriverLocation, booking.driverLocation, mapType, booking.bookingStatus]);
+
+  return (
+    <div className="relative">
+      <div ref={mapRef} className="w-full h-[300px] sm:h-[400px] md:h-[500px] rounded-lg sm:rounded-xl border-2 border-gray-200 overflow-hidden" />
+      
+      {/* Live Update Indicator */}
+      {mapType === 'route' && liveDriverLocation && (
+        <div className="absolute top-3 left-3 bg-green-500 text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-xs font-medium animate-pulse z-10">
+          <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
+          <span>Live Tracking Active</span>
+        </div>
+      )}
+      
+      {/* Last Update Time */}
+      {mapType === 'route' && liveDriverLocation && (
+        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg text-xs font-medium text-gray-700 z-10">
+          🕐 Updated: {new Date(liveDriverLocation.timestamp || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const StatusBadge = ({ status, booking }) => {
   const cfg = {
@@ -64,13 +477,26 @@ const BookingRow = ({ booking, onRefresh }) => {
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapType, setMapType] = useState('route'); // 'route', 'pickup', 'drop'
 
+  // Debug: Log when booking prop changes
+  useEffect(() => {
+    console.log('🔄 BookingRow: Booking prop updated:', {
+      bookingId: booking._id?.slice(-8),
+      passengerName: booking.passengerDetails?.name,
+      status: booking.bookingStatus,
+      driverLocation: booking.driverLocation,
+      assignedDriver: booking.assignedDriver,
+      pickup: booking.pickup,
+      drop: booking.drop
+    });
+  }, [booking]);
+
   const handleOpenMap = (e) => {
     e.stopPropagation();
     setMapType('route');
     setShowMapModal(true);
   };
 
-  const canCancel = ['pending', 'ongoing'].includes(booking.bookingStatus?.toLowerCase());
+  const canCancel = ['pending', 'accepted'].includes(booking.bookingStatus?.toLowerCase()); // Pending and Accepted bookings can be cancelled
 
   const handleCancelBooking = async () => {
     if (!cancelReason.trim()) {
@@ -202,8 +628,12 @@ const BookingRow = ({ booking, onRefresh }) => {
                 className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2 font-medium shadow-lg shadow-blue-200"
               >
                 <FaMapMarkedAlt size={16} />
-                {booking.bookingStatus?.toLowerCase() === 'ongoing' 
-                  ? 'Track Live Location on Google Maps' 
+                {booking.bookingStatus?.toLowerCase() === 'accepted'
+                  ? '🟢 Track Driver to Pickup Location'
+                  : booking.bookingStatus?.toLowerCase() === 'ongoing' 
+                  ? '🔵 Track Live Location to Drop' 
+                  : booking.bookingStatus?.toLowerCase() === 'completed'
+                  ? '⚪ View Completed Trip Route'
                   : 'View Route on Google Maps'
                 }
               </button>
@@ -294,369 +724,122 @@ const BookingRow = ({ booking, onRefresh }) => {
       {showMapModal && (
         <tr>
           <td colSpan={11}>
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowMapModal(false)}>
-              <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 sm:p-4" onClick={() => setShowMapModal(false)}>
+              <div className="bg-white rounded-xl sm:rounded-2xl w-full max-w-6xl max-h-[95vh] sm:max-h-[90vh] shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
                 {/* Modal Header */}
-                <div className="flex items-center justify-between p-4 border-b">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <FaMapMarkedAlt className="text-blue-600" size={18} />
+                <div className="flex items-center justify-between p-3 sm:p-4 border-b shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                      <FaMapMarkedAlt className="text-blue-600" size={16} />
                     </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm sm:text-lg font-bold text-gray-900 truncate">
                         {mapType === 'route' 
                           ? booking.bookingStatus?.toLowerCase() === 'accepted'
-                            ? '🚗 Driver on the way to Pickup'
+                            ? '🟢 Driver on the way to Pickup'
                             : booking.bookingStatus?.toLowerCase() === 'ongoing'
-                            ? '🚗 Live Tracking - En Route'
+                            ? '🔵 Live Tracking - En Route to Drop'
+                            : booking.bookingStatus?.toLowerCase() === 'completed'
+                            ? '⚪ Trip Completed - Full Route'
                             : 'Route Map'
                           : mapType === 'pickup' 
                           ? 'Pickup Location' 
                           : 'Drop Location'
                         }
                       </h3>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 truncate">
                         {booking.passengerDetails?.name} - {booking._id?.slice(-8)}
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => setShowMapModal(false)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+                    className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-all shrink-0 ml-2"
                   >
-                    <FaTimes size={18} className="text-gray-400" />
+                    <FaTimes size={16} className="text-gray-400" />
                   </button>
                 </div>
 
-                {/* Map Container */}
-                <div className="p-4">
-                  <div 
-                    className="w-full h-[500px] rounded-xl border-2 border-gray-200 overflow-hidden"
-                    ref={(el) => {
-                      if (el && !el.dataset.initialized && window.google) {
-                        el.dataset.initialized = 'true';
-                        
-                        const pickupLat = booking.pickup?.latitude || booking.pickup?.lat;
-                        const pickupLng = booking.pickup?.longitude || booking.pickup?.lng;
-                        const dropLat = booking.drop?.latitude || booking.drop?.lat;
-                        const dropLng = booking.drop?.longitude || booking.drop?.lng;
-                        
-                        // Driver location (mock for now - backend se aayega)
-                        const driverLat = booking.driverLocation?.latitude || booking.driverLocation?.lat || pickupLat;
-                        const driverLng = booking.driverLocation?.longitude || booking.driverLocation?.lng || pickupLng;
-
-                        const status = booking.bookingStatus?.toLowerCase();
-
-                        if (mapType === 'route') {
-                          // ACCEPTED Status: Pickup + Driver Location
-                          if (status === 'accepted' && pickupLat && pickupLng) {
-                            const map = new window.google.maps.Map(el, {
-                              center: { lat: pickupLat, lng: pickupLng },
-                              zoom: 14,
-                              mapTypeControl: true,
-                              streetViewControl: true,
-                              fullscreenControl: true,
-                            });
-
-                            // Pickup Marker (Green)
-                            new window.google.maps.Marker({
-                              position: { lat: pickupLat, lng: pickupLng },
-                              map: map,
-                              title: 'Pickup Location',
-                              label: { text: 'P', color: 'white', fontWeight: 'bold' },
-                              animation: window.google.maps.Animation.DROP,
-                              icon: {
-                                url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
-                                scaledSize: new window.google.maps.Size(50, 50)
-                              }
-                            });
-
-                            // Driver Marker (Car Icon - From Backend)
-                            const carImage = booking.carCategory?.image 
-                              ? `${import.meta.env.VITE_API_BASE_URL}/uploads/${booking.carCategory.image}`
-                              : 'https://maps.google.com/mapfiles/kml/shapes/cabs.png';
-
-                            const driverMarker = new window.google.maps.Marker({
-                              position: { lat: driverLat, lng: driverLng },
-                              map: map,
-                              title: `Driver: ${booking.assignedDriver?.name || 'On the way'}`,
-                              icon: {
-                                url: carImage,
-                                scaledSize: new window.google.maps.Size(60, 60)
-                              }
-                            });
-
-                            // Draw LINE between Pickup and Driver (RED line)
-                            const lineCoordinates = [
-                              { lat: pickupLat, lng: pickupLng },
-                              { lat: driverLat, lng: driverLng }
-                            ];
-
-                            new window.google.maps.Polyline({
-                              path: lineCoordinates,
-                              geodesic: true,
-                              strokeColor: '#EF4444',
-                              strokeOpacity: 0.8,
-                              strokeWeight: 4,
-                              map: map,
-                              icons: [{
-                                icon: {
-                                  path: 'M 0,-1 0,1',
-                                  strokeOpacity: 1,
-                                  scale: 3
-                                },
-                                offset: '0',
-                                repeat: '20px'
-                              }]
-                            });
-
-                            // Info window for driver
-                            const infoWindow = new window.google.maps.InfoWindow({
-                              content: `<div style="padding: 8px;">
-                                <p style="font-weight: bold; margin: 0; color: #1f2937;">🚗 ${booking.assignedDriver?.name || 'Driver'}</p>
-                                <p style="font-size: 12px; margin: 4px 0 0 0; color: #6b7280;">On the way to pickup</p>
-                              </div>`
-                            });
-                            
-                            driverMarker.addListener('click', () => {
-                              infoWindow.open(map, driverMarker);
-                            });
-
-                            // Auto-fit bounds
-                            const bounds = new window.google.maps.LatLngBounds();
-                            bounds.extend({ lat: pickupLat, lng: pickupLng });
-                            bounds.extend({ lat: driverLat, lng: driverLng });
-                            map.fitBounds(bounds);
-
-                          } 
-                          // ONGOING Status: Pickup + Drop + Driver Location
-                          else if (status === 'ongoing' && pickupLat && pickupLng && dropLat && dropLng) {
-                            const map = new window.google.maps.Map(el, {
-                              center: { lat: pickupLat, lng: pickupLng },
-                              zoom: 12,
-                              mapTypeControl: true,
-                              streetViewControl: true,
-                              fullscreenControl: true,
-                            });
-
-                            // Pickup Marker (Green)
-                            new window.google.maps.Marker({
-                              position: { lat: pickupLat, lng: pickupLng },
-                              map: map,
-                              title: 'Pickup Location (Started)',
-                              label: { text: 'P', color: 'white', fontWeight: 'bold' },
-                              icon: {
-                                url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
-                                scaledSize: new window.google.maps.Size(40, 40)
-                              }
-                            });
-
-                            // Drop Marker (Red)
-                            new window.google.maps.Marker({
-                              position: { lat: dropLat, lng: dropLng },
-                              map: map,
-                              title: 'Drop Location (Destination)',
-                              label: { text: 'D', color: 'white', fontWeight: 'bold' },
-                              icon: {
-                                url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                                scaledSize: new window.google.maps.Size(40, 40)
-                              }
-                            });
-
-                            // Driver Marker (Car Icon - From Backend)
-                            const carImage = booking.carCategory?.image 
-                              ? `${import.meta.env.VITE_API_BASE_URL}/uploads/${booking.carCategory.image}`
-                              : 'https://maps.google.com/mapfiles/kml/shapes/cabs.png';
-
-                            const driverMarker = new window.google.maps.Marker({
-                              position: { lat: driverLat, lng: driverLng },
-                              map: map,
-                              title: `Driver: ${booking.assignedDriver?.name || 'En route'}`,
-                              icon: {
-                                url: carImage,
-                                scaledSize: new window.google.maps.Size(60, 60)
-                              }
-                            });
-
-                            // Info window for driver
-                            const infoWindow = new window.google.maps.InfoWindow({
-                              content: `<div style="padding: 8px;">
-                                <p style="font-weight: bold; margin: 0; color: #1f2937;">🚗 ${booking.assignedDriver?.name || 'Driver'}</p>
-                                <p style="font-size: 12px; margin: 4px 0 0 0; color: #6b7280;">En route to destination</p>
-                              </div>`
-                            });
-                            
-                            driverMarker.addListener('click', () => {
-                              infoWindow.open(map, driverMarker);
-                            });
-
-                            // Draw Route (Pickup to Drop)
-                            const directionsService = new window.google.maps.DirectionsService();
-                            const directionsRenderer = new window.google.maps.DirectionsRenderer({
-                              map: map,
-                              suppressMarkers: true,
-                              polylineOptions: {
-                                strokeColor: '#2563EB',
-                                strokeWeight: 4,
-                                strokeOpacity: 0.7
-                              }
-                            });
-
-                            directionsService.route({
-                              origin: { lat: pickupLat, lng: pickupLng },
-                              destination: { lat: dropLat, lng: dropLng },
-                              travelMode: window.google.maps.TravelMode.DRIVING
-                            }, (result, status) => {
-                              if (status === 'OK') {
-                                directionsRenderer.setDirections(result);
-                              }
-                            });
-
-                            // Auto-fit bounds
-                            const bounds = new window.google.maps.LatLngBounds();
-                            bounds.extend({ lat: pickupLat, lng: pickupLng });
-                            bounds.extend({ lat: dropLat, lng: dropLng });
-                            bounds.extend({ lat: driverLat, lng: driverLng });
-                            map.fitBounds(bounds);
-                          }
-                          // COMPLETED Status: Full route
-                          else if (status === 'completed' && pickupLat && pickupLng && dropLat && dropLng) {
-                            const map = new window.google.maps.Map(el, {
-                              center: { lat: pickupLat, lng: pickupLng },
-                              zoom: 12,
-                              mapTypeControl: true,
-                              streetViewControl: true,
-                              fullscreenControl: true,
-                            });
-
-                            // Pickup Marker
-                            new window.google.maps.Marker({
-                              position: { lat: pickupLat, lng: pickupLng },
-                              map: map,
-                              title: 'Pickup Location',
-                              label: 'P',
-                              icon: {
-                                url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
-                                scaledSize: new window.google.maps.Size(40, 40)
-                              }
-                            });
-
-                            // Drop Marker
-                            new window.google.maps.Marker({
-                              position: { lat: dropLat, lng: dropLng },
-                              map: map,
-                              title: 'Drop Location',
-                              label: 'D',
-                              icon: {
-                                url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                                scaledSize: new window.google.maps.Size(40, 40)
-                              }
-                            });
-
-                            // Draw Route
-                            const directionsService = new window.google.maps.DirectionsService();
-                            const directionsRenderer = new window.google.maps.DirectionsRenderer({
-                              map: map,
-                              suppressMarkers: true,
-                              polylineOptions: {
-                                strokeColor: '#10B981',
-                                strokeWeight: 5,
-                                strokeOpacity: 0.8
-                              }
-                            });
-
-                            directionsService.route({
-                              origin: { lat: pickupLat, lng: pickupLng },
-                              destination: { lat: dropLat, lng: dropLng },
-                              travelMode: window.google.maps.TravelMode.DRIVING
-                            }, (result, status) => {
-                              if (status === 'OK') {
-                                directionsRenderer.setDirections(result);
-                              }
-                            });
-                          }
-
-                        } else if (mapType === 'pickup' && pickupLat && pickupLng) {
-                          // Pickup Only
-                          const map = new window.google.maps.Map(el, {
-                            center: { lat: pickupLat, lng: pickupLng },
-                            zoom: 16,
-                            mapTypeControl: true,
-                            streetViewControl: true,
-                            fullscreenControl: true,
-                          });
-
-                          new window.google.maps.Marker({
-                            position: { lat: pickupLat, lng: pickupLng },
-                            map: map,
-                            title: 'Pickup Location',
-                            animation: window.google.maps.Animation.BOUNCE,
-                            icon: {
-                              url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
-                              scaledSize: new window.google.maps.Size(50, 50)
-                            }
-                          });
-
-                        } else if (mapType === 'drop' && dropLat && dropLng) {
-                          // Drop Only
-                          const map = new window.google.maps.Map(el, {
-                            center: { lat: dropLat, lng: dropLng },
-                            zoom: 16,
-                            mapTypeControl: true,
-                            streetViewControl: true,
-                            fullscreenControl: true,
-                          });
-
-                          new window.google.maps.Marker({
-                            position: { lat: dropLat, lng: dropLng },
-                            map: map,
-                            title: 'Drop Location',
-                            animation: window.google.maps.Animation.BOUNCE,
-                            icon: {
-                              url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                              scaledSize: new window.google.maps.Size(50, 50)
-                            }
-                          });
-                        }
-                      }
-                    }}
-                  />
-                </div>
-
-                {/* Location Details */}
-                <div className="p-4 border-t bg-gray-50 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                      <MapPin size={14} className="text-green-600" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500 font-medium">Pickup</p>
-                      <p className="text-sm text-gray-800">{booking.pickup?.address}</p>
-                    </div>
+                {/* Map Container - Scrollable */}
+                <div className="flex-1 overflow-y-auto">
+                  <div className="p-2 sm:p-4">
+                    <LiveMapModalContent booking={booking} mapType={mapType} />
                   </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                      <MapPin size={14} className="text-red-600" />
+
+                  {/* Location Details */}
+                  <div className="p-3 sm:p-4 border-t bg-gray-50 space-y-3">
+                    {/* Route Legend - Show only for route map */}
+                    {mapType === 'route' && (
+                      <div className="bg-white rounded-lg p-2.5 sm:p-3 border border-gray-200">
+                        <p className="text-xs font-semibold text-gray-700 mb-2">🗺️ Route Legend:</p>
+                        <div className="flex flex-wrap gap-2 sm:gap-3 text-xs">
+                          {booking.bookingStatus?.toLowerCase() === 'accepted' && (
+                            <div className="flex items-center gap-1.5 sm:gap-2">
+                              <div className="w-6 sm:w-8 h-0.5 sm:h-1 bg-green-500 rounded"></div>
+                              <span className="text-gray-600">Driver → Pickup</span>
+                            </div>
+                          )}
+                          {booking.bookingStatus?.toLowerCase() === 'ongoing' && (
+                            <div className="flex items-center gap-1.5 sm:gap-2">
+                              <div className="w-6 sm:w-8 h-0.5 sm:h-1 bg-blue-500 rounded"></div>
+                              <span className="text-gray-600">Driver → Drop</span>
+                            </div>
+                          )}
+                          {booking.bookingStatus?.toLowerCase() === 'completed' && (
+                            <div className="flex items-center gap-1.5 sm:gap-2">
+                              <div className="w-6 sm:w-8 h-0.5 sm:h-1 bg-gray-500 rounded"></div>
+                              <span className="text-gray-600">Pickup → Drop</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded-full"></div>
+                            <span className="text-gray-600">Pickup</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded-full"></div>
+                            <span className="text-gray-600">Drop</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <span className="text-base sm:text-lg">🚗</span>
+                            <span className="text-gray-600">Driver</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-start gap-2">
+                      <div className="w-5 h-5 sm:w-6 sm:h-6 bg-green-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                        <MapPin size={12} className="text-green-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500 font-medium">Pickup</p>
+                        <p className="text-xs sm:text-sm text-gray-800 break-words">{booking.pickup?.address}</p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500 font-medium">Drop</p>
-                      <p className="text-sm text-gray-800">{booking.drop?.address}</p>
+                    <div className="flex items-start gap-2">
+                      <div className="w-5 h-5 sm:w-6 sm:h-6 bg-red-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                        <MapPin size={12} className="text-red-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500 font-medium">Drop</p>
+                        <p className="text-xs sm:text-sm text-gray-800 break-words">{booking.drop?.address}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4 pt-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">Distance:</span>
-                      <span className="text-sm font-semibold text-gray-800">{booking.estimatedDistanceKm} km</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">Status:</span>
-                      <StatusBadge status={booking.bookingStatus} booking={booking} />
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">Distance:</span>
+                        <span className="text-xs sm:text-sm font-semibold text-gray-800">{booking.estimatedDistanceKm} km</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">Status:</span>
+                        <StatusBadge status={booking.bookingStatus} booking={booking} />
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-4 border-t flex gap-3">
+                <div className="p-3 sm:p-4 border-t flex flex-col sm:flex-row gap-2 sm:gap-3 shrink-0">
                   <button
                     onClick={() => {
                       const pickupLat = booking.pickup?.latitude || booking.pickup?.lat;
@@ -670,14 +853,15 @@ const BookingRow = ({ booking, onRefresh }) => {
                         toast.success('Google Maps app open ho raha hai!');
                       }
                     }}
-                    className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-medium flex items-center justify-center gap-2"
+                    className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg sm:rounded-xl hover:bg-blue-700 transition-all font-medium flex items-center justify-center gap-2 text-sm"
                   >
                     <FaMapMarkedAlt size={14} />
-                    Open in Google Maps
+                    <span className="hidden sm:inline">Open in Google Maps</span>
+                    <span className="sm:hidden">Google Maps</span>
                   </button>
                   <button
                     onClick={() => setShowMapModal(false)}
-                    className="px-6 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50 transition-all font-medium"
+                    className="px-4 sm:px-6 py-2 sm:py-2.5 border border-gray-300 rounded-lg sm:rounded-xl hover:bg-gray-50 transition-all font-medium text-sm"
                   >
                     Close
                   </button>

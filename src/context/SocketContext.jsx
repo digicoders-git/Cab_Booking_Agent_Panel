@@ -42,13 +42,20 @@ export const SocketProvider = ({ children }) => {
       console.log('✅ WebSocket Connected!', newSocket.id);
       setConnected(true);
       
-      // Join agent room
-      newSocket.emit('join_room', {
-        userId: admin._id,
-        role: 'agent'
-      });
+      const agentId = admin?._id || admin?.id || admin?.agentId;
+      console.log('🔌 Attempting to join room with ID:', agentId);
+
+      if (agentId) {
+        // Join agent room
+        newSocket.emit('join_room', {
+          userId: agentId,
+          role: 'agent'
+        });
+        console.log('🚪 Sent join_room request for:', `agent_${agentId}`);
+      } else {
+        console.warn('⚠️ No agent ID found in admin object, room joining skipped!');
+      }
       
-      console.log('🚪 Joined agent room:', `agent_${admin._id}`);
       toast.success('Real-time updates active! 🔔');
     });
 
@@ -102,6 +109,12 @@ export const SocketProvider = ({ children }) => {
     // Driver location updates
     newSocket.on('driver_location_update', (data) => {
       console.log('📍 Driver Location Update:', data);
+      console.log('🕐 Timestamp:', new Date().toLocaleTimeString());
+      console.log('🚗 Driver ID:', data.driverId);
+      console.log('📌 Coordinates:', { lat: data.latitude, lng: data.longitude });
+      console.log('🧭 Heading:', data.heading);
+      console.log('⚡ Speed:', data.speed);
+      console.log('-----------------------------------');
       
       // Dispatch custom event
       window.dispatchEvent(new CustomEvent('driver_location_update', { detail: data }));
