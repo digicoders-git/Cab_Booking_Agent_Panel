@@ -11,10 +11,45 @@ const LiveMapModalContent = ({ booking, mapType }) => {
   const mapInstanceRef = useRef(null);
   const driverMarkerRef = useRef(null);
   const infoWindowRef = useRef(null);
-  const directionsRendererRef = useRef(null); // ✅ Store DirectionsRenderer
-  const [liveDriverLocation, setLiveDriverLocation] = useState(null); // 🔴 NEW: Live location state
+  const directionsRendererRef = useRef(null);
+  const [liveDriverLocation, setLiveDriverLocation] = useState(null);
 
-  // 🔴 NEW: Listen to real-time location updates
+  // Helper function to extract coordinates robustly
+  const getCoords = (obj, type = '') => {
+    if (!obj) {
+      if (type === 'pickup') return { lat: Number(booking.pickupLat), lng: Number(booking.pickupLng) };
+      if (type === 'drop') return { lat: Number(booking.dropLat), lng: Number(booking.dropLng) };
+      return null;
+    }
+    const lat = obj.coordinates?.lat || obj.lat || obj.latitude;
+    const lng = obj.coordinates?.lng || obj.lng || obj.longitude;
+    return (lat && lng) ? { lat: Number(lat), lng: Number(lng) } : null;
+  };
+
+  const pickupPos = getCoords(booking.pickup, 'pickup');
+  const dropPos = getCoords(booking.drop, 'drop');
+
+  // ✅ FIX 1: Watch booking.driverLocation prop directly
+  // AgentBookings.jsx WebSocket se update karta hai booking.driverLocation
+  // Jab bhi woh change ho, map marker update ho jaye
+  useEffect(() => {
+    const dLoc = booking.driverLocation;
+    if (dLoc?.latitude && dLoc?.longitude) {
+      console.log('📍 booking.driverLocation prop changed → updating map marker:', {
+        bookingId: booking._id?.slice(-8),
+        lat: dLoc.latitude,
+        lng: dLoc.longitude
+      });
+      setLiveDriverLocation({
+        latitude: dLoc.latitude,
+        longitude: dLoc.longitude,
+        heading: dLoc.heading || 0,
+        timestamp: dLoc.lastUpdated || Date.now()
+      });
+    }
+  }, [booking.driverLocation, booking._id]);
+
+  // ✅ FIX 2: Direct WebSocket listener (backup) — driverId comparison with debug
   useEffect(() => {
     const handleLiveLocationUpdate = (event) => {
       const data = event.detail;
@@ -22,396 +57,246 @@ const LiveMapModalContent = ({ booking, mapType }) => {
         ? booking.assignedDriver?._id 
         : booking.assignedDriver;
 
-      console.log('🗺️ LiveMapModalContent: Checking location update:', {
+      console.log('🔌 WebSocket event in LiveMapModalContent:', {
         incomingDriverId: data.driverId,
         bookingDriverId: driverId,
-        match: data.driverId === driverId,
-        bookingStatus: booking.bookingStatus
+        match: data.driverId === driverId
       });
 
-      // Only update if this is the correct driver for this booking
       if (data.driverId === driverId) {
-        console.log('✅ MATCH! Updating live location in map:', {
-          lat: data.latitude,
-          lng: data.longitude,
-          heading: data.heading
-        });
+        console.log('✅ Direct WebSocket Match for Booking:', booking._id?.slice(-8));
         setLiveDriverLocation({
           latitude: data.latitude,
           longitude: data.longitude,
-          heading: data.heading,
-          timestamp: data.timestamp
+          heading: data.heading || 0,
+          timestamp: data.timestamp || Date.now()
         });
       }
     };
 
     window.addEventListener('driver_location_update', handleLiveLocationUpdate);
-
-    return () => {
-      window.removeEventListener('driver_location_update', handleLiveLocationUpdate);
-    };
+    return () => window.removeEventListener('driver_location_update', handleLiveLocationUpdate);
   }, [booking.assignedDriver, booking._id]);
 
-  // 1. Initial Map Setup
+  // Initial Map Setup
   useEffect(() => {
-    if (!mapRef.current || !window.google) return;
+    if (!mapRef.current || !window.google || !pickupPos) return;
 
-    const pickupLat = booking.pickup?.latitude || booking.pickup?.lat;
-    const pickupLng = booking.pickup?.longitude || booking.pickup?.lng;
-    const dropLat = booking.drop?.latitude || booking.drop?.lat;
-    const dropLng = booking.drop?.longitude || booking.drop?.lng;
-    const driverLat = booking.driverLocation?.latitude || booking.driverLocation?.lat || pickupLat;
-    const driverLng = booking.driverLocation?.longitude || booking.driverLocation?.lng || pickupLng;
     const status = booking.bookingStatus?.toLowerCase();
+    const dLoc = booking.driverLocation || {};
+    // ✅ FIX 3: Agar driverLocation nahi hai toh pickup pe mat rakho
+    // Pickup ke paas hi center karo map ko, marker hidden rakho
+    const hasRealDriverLocation = !!(dLoc.latitude && dLoc.longitude);
+    const driverLat = dLoc.latitude || dLoc.lat || null;
+    const driverLng = dLoc.longitude || dLoc.lng || null;
+
+    console.log('🗺️ Map Init - Driver Location Status:', {
+      bookingId: booking._id?.slice(-8),
+      hasRealDriverLocation,
+      driverLat,
+      driverLng,
+      driverLocation: booking.driverLocation
+    });
 
     const map = new window.google.maps.Map(mapRef.current, {
-      center: { lat: pickupLat, lng: pickupLng },
+      center: pickupPos,
       zoom: 14,
       mapTypeControl: true,
-      streetViewControl: true,
+      streetViewControl: false,
       fullscreenControl: true,
     });
     mapInstanceRef.current = map;
 
-    if (mapType === 'route') {
-      // Setup Markers for Route
-      if (pickupLat && pickupLng) {
-        new window.google.maps.Marker({
-          position: { lat: pickupLat, lng: pickupLng },
-          map: map,
-          title: 'Pickup',
-          label: { text: 'P', color: 'white', fontWeight: 'bold' },
-          icon: { url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png', scaledSize: new window.google.maps.Size(50, 50) }
-        });
-      }
+    // 1. Pickup Marker
+    new window.google.maps.Marker({
+      position: pickupPos,
+      map,
+      title: 'Pickup',
+      label: { text: 'P', color: 'white', fontWeight: 'bold' },
+      icon: { url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png', scaledSize: new window.google.maps.Size(40, 40) }
+    });
 
-      if (dropLat && dropLng) {
-        new window.google.maps.Marker({
-          position: { lat: dropLat, lng: dropLng },
-          map: map,
-          title: 'Drop',
-          label: { text: 'D', color: 'white', fontWeight: 'bold' },
-          icon: { url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png', scaledSize: new window.google.maps.Size(50, 50) }
-        });
-      }
+    // 2. Drop Marker
+    if (dropPos) {
+      new window.google.maps.Marker({
+        position: dropPos,
+        map,
+        title: 'Drop',
+        label: { text: 'D', color: 'white', fontWeight: 'bold' },
+        icon: { url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png', scaledSize: new window.google.maps.Size(40, 40) }
+      });
+    }
 
-      // Driver Marker with Custom Car Icon
-      const driverName = typeof booking.assignedDriver === 'object' 
-        ? booking.assignedDriver?.name 
-        : booking.assignedDriver || 'Driver';
-      
-      // Custom car icon SVG - Better visibility
-      const carIconSvg = `
-        <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-          <!-- Shadow -->
-          <ellipse cx="24" cy="42" rx="16" ry="3" fill="rgba(0,0,0,0.2)"/>
-          <!-- Car Body -->
-          <path d="M12 28 L12 32 C12 33 13 34 14 34 L16 34 C17 34 18 33 18 32 L18 30 L30 30 L30 32 C30 33 31 34 32 34 L34 34 C35 34 36 33 36 32 L36 28 L38 28 C39 28 40 27 40 26 L40 20 C40 19 39.5 18 38.5 17 L35 12 C34.5 11 33.5 10 32 10 L16 10 C14.5 10 13.5 11 13 12 L9.5 17 C8.5 18 8 19 8 20 L8 26 C8 27 9 28 10 28 L12 28 Z" fill="#3B82F6" stroke="#1E40AF" stroke-width="1.5"/>
-          <!-- Windows -->
-          <path d="M14 16 L18 12 L30 12 L34 16 L34 20 L14 20 Z" fill="#93C5FD" stroke="#1E40AF" stroke-width="1"/>
-          <!-- Windshield divider -->
-          <line x1="24" y1="12" x2="24" y2="20" stroke="#1E40AF" stroke-width="1.5"/>
-          <!-- Headlights -->
-          <circle cx="12" cy="24" r="2" fill="#FCD34D"/>
-          <circle cx="36" cy="24" r="2" fill="#FCD34D"/>
-          <!-- Wheels -->
-          <circle cx="14" cy="30" r="3" fill="#1F2937" stroke="#000" stroke-width="1"/>
-          <circle cx="34" cy="30" r="3" fill="#1F2937" stroke="#000" stroke-width="1"/>
-          <!-- Wheel centers -->
-          <circle cx="14" cy="30" r="1.5" fill="#6B7280"/>
-          <circle cx="34" cy="30" r="1.5" fill="#6B7280"/>
+    // 3. Driver Marker (Custom Car SVG)
+    const getCarIcon = (heading = 0) => {
+      const svg = `
+        <svg width="40" height="40" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <g transform="rotate(${heading} 24 24)">
+            <ellipse cx="24" cy="42" rx="16" ry="3" fill="rgba(0,0,0,0.2)"/>
+            <path d="M12 28 L12 32 C12 33 13 34 14 34 L16 34 C17 34 18 33 18 32 L18 30 L30 30 L30 32 C30 33 31 34 32 34 L34 34 C35 34 36 33 36 32 L36 28 L38 28 C39 28 40 27 40 26 L40 20 C40 19 39.5 18 38.5 17 L35 12 C34.5 11 33.5 10 32 10 L16 10 C14.5 10 13.5 11 13 12 L9.5 17 C8.5 18 8 19 8 20 L8 26 C8 27 9 28 10 28 L12 28 Z" fill="#3B82F6" stroke="#1E40AF" stroke-width="1.5"/>
+            <path d="M14 16 L18 12 L30 12 L34 16 L34 20 L14 20 Z" fill="#93C5FD" stroke="#1E40AF" stroke-width="1"/>
+          </g>
         </svg>
       `;
-      
-      const carIconUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(carIconSvg);
-
-      const driverMarker = new window.google.maps.Marker({
-        position: { lat: driverLat, lng: driverLng },
-        map: map,
-        title: `Driver: ${driverName}`,
-        icon: { 
-          url: carIconUrl,
-          scaledSize: new window.google.maps.Size(48, 48),
-          anchor: new window.google.maps.Point(24, 24) // Center the icon
-        },
-        zIndex: 1000,
-        animation: window.google.maps.Animation.DROP
-      });
-      driverMarkerRef.current = driverMarker;
-
-      const infoWindow = new window.google.maps.InfoWindow({
-        content: `
-          <div style="padding: 8px; min-width: 150px;">
-            <p style="font-weight: bold; margin: 0 0 4px 0; color: #1F2937;">🚗 ${driverName}</p>
-            <p style="margin: 0; font-size: 11px; color: #6B7280;">Live Location</p>
-          </div>
-        `
-      });
-      infoWindowRef.current = infoWindow;
-      driverMarker.addListener('click', () => infoWindow.open(map, driverMarker));
-
-      // ✅ ROUTE LINE DRAWING - Based on Status
-      const directionsService = new window.google.maps.DirectionsService();
-      
-      // Clear previous renderer if exists
-      if (directionsRendererRef.current) {
-        directionsRendererRef.current.setMap(null);
-      }
-      
-      if (status === 'accepted') {
-        // 🟢 ACCEPTED: Driver → Pickup (Green Line)
-        console.log('🟢 Drawing ACCEPTED route: Driver → Pickup');
-        const directionsRenderer = new window.google.maps.DirectionsRenderer({
-          map: map,
-          suppressMarkers: true, // Hide default markers
-          polylineOptions: { 
-            strokeColor: '#10B981', // Green color
-            strokeWeight: 5, 
-            strokeOpacity: 0.8 
-          },
-          preserveViewport: false // Allow auto-zoom to route
-        });
-        directionsRendererRef.current = directionsRenderer; // Store in ref
-
-        directionsService.route({
-          origin: { lat: driverLat, lng: driverLng },
-          destination: { lat: pickupLat, lng: pickupLng },
-          travelMode: window.google.maps.TravelMode.DRIVING
-        }, (result, status) => { 
-          if (status === 'OK') {
-            directionsRenderer.setDirections(result);
-            console.log('✅ ACCEPTED route drawn successfully!');
-          } else {
-            console.error('❌ ACCEPTED route failed:', status);
-          }
-        });
-
-      } else if (status === 'ongoing') {
-        // 🔵 ONGOING: Driver → Drop (Blue Line)
-        console.log('🔵 Drawing ONGOING route: Driver → Drop');
-        const directionsRenderer = new window.google.maps.DirectionsRenderer({
-          map: map,
-          suppressMarkers: true, // Hide default markers
-          polylineOptions: { 
-            strokeColor: '#3B82F6', // Blue color
-            strokeWeight: 5, 
-            strokeOpacity: 0.8 
-          },
-          preserveViewport: false
-        });
-        directionsRendererRef.current = directionsRenderer; // Store in ref
-
-        directionsService.route({
-          origin: { lat: driverLat, lng: driverLng },
-          destination: { lat: dropLat, lng: dropLng },
-          travelMode: window.google.maps.TravelMode.DRIVING
-        }, (result, status) => { 
-          if (status === 'OK') {
-            directionsRenderer.setDirections(result);
-            console.log('✅ ONGOING route drawn successfully!');
-          } else {
-            console.error('❌ ONGOING route failed:', status);
-          }
-        });
-
-      } else if (status === 'completed') {
-        // ⚪ COMPLETED: Pickup → Drop (Gray Line) - Full route
-        console.log('⚪ Drawing COMPLETED route: Pickup → Drop');
-        const directionsRenderer = new window.google.maps.DirectionsRenderer({
-          map: map,
-          suppressMarkers: true,
-          polylineOptions: { 
-            strokeColor: '#6B7280', // Gray color
-            strokeWeight: 4, 
-            strokeOpacity: 0.6 
-          },
-          preserveViewport: false
-        });
-        directionsRendererRef.current = directionsRenderer; // Store in ref
-
-        directionsService.route({
-          origin: { lat: pickupLat, lng: pickupLng },
-          destination: { lat: dropLat, lng: dropLng },
-          travelMode: window.google.maps.TravelMode.DRIVING
-        }, (result, status) => { 
-          if (status === 'OK') {
-            directionsRenderer.setDirections(result);
-            console.log('✅ COMPLETED route drawn successfully!');
-          } else {
-            console.error('❌ COMPLETED route failed:', status);
-          }
-        });
-      }
-
-      // Auto-fit bounds only if no route is being drawn
-      if (!['accepted', 'ongoing', 'completed'].includes(status)) {
-        const bounds = new window.google.maps.LatLngBounds();
-        if (pickupLat && pickupLng) bounds.extend({ lat: pickupLat, lng: pickupLng });
-        if (dropLat && dropLng) bounds.extend({ lat: dropLat, lng: dropLng });
-        bounds.extend({ lat: driverLat, lng: driverLng });
-        map.fitBounds(bounds);
-      }
-
-    } else if (mapType === 'pickup' && pickupLat && pickupLng) {
-      new window.google.maps.Marker({
-        position: { lat: pickupLat, lng: pickupLng },
-        map: map,
-        animation: window.google.maps.Animation.BOUNCE,
-        icon: { url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png', scaledSize: new window.google.maps.Size(50, 50) }
-      });
-      map.setCenter({ lat: pickupLat, lng: pickupLng });
-      map.setZoom(16);
-    } else if (mapType === 'drop' && dropLat && dropLng) {
-      new window.google.maps.Marker({
-        position: { lat: dropLat, lng: dropLng },
-        map: map,
-        animation: window.google.maps.Animation.BOUNCE,
-        icon: { url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png', scaledSize: new window.google.maps.Size(50, 50) }
-      });
-      map.setCenter({ lat: dropLat, lng: dropLng });
-      map.setZoom(16);
-    }
-
-    // Cleanup function
-    return () => {
-      if (directionsRendererRef.current) {
-        directionsRendererRef.current.setMap(null);
-        directionsRendererRef.current = null;
-      }
-      if (driverMarkerRef.current) {
-        driverMarkerRef.current.setMap(null);
-        driverMarkerRef.current = null;
-      }
-      if (infoWindowRef.current) {
-        infoWindowRef.current.close();
-        infoWindowRef.current = null;
-      }
+      return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
     };
 
-  }, [mapType, booking._id, booking.bookingStatus]);
-
-  // 2. Real-time Position Update - Using liveDriverLocation state
-  useEffect(() => {
-    console.log('🔍 LiveMapModalContent: Live location state changed:', {
-      bookingId: booking._id?.slice(-8),
-      hasMarker: !!driverMarkerRef.current,
-      hasGoogle: !!window.google,
-      mapType,
-      liveDriverLocation,
-      bookingStatus: booking.bookingStatus
+    // ✅ FIX 4: Sirf real driver location ho toh marker dikhao, warna hidden
+    const driverMarker = new window.google.maps.Marker({
+      position: hasRealDriverLocation 
+        ? { lat: driverLat, lng: driverLng } 
+        : pickupPos, // temporary position, visible: false se chupaaya
+      map: hasRealDriverLocation ? map : null, // ← Real location nahi hai toh map pe mat dikhao!
+      icon: { url: getCarIcon(0), scaledSize: new window.google.maps.Size(40, 40), anchor: new window.google.maps.Point(20, 20) },
+      zIndex: 1000,
+      visible: hasRealDriverLocation // ← Real location nahi toh invisible
     });
+    driverMarker.setMap(map); // Map se connect karo (marker object chahiye future updates ke liye)
+    driverMarkerRef.current = driverMarker;
 
-    if (!driverMarkerRef.current || !window.google || mapType !== 'route') {
-      console.log('⚠️ Map Update Skipped:', {
-        hasMarker: !!driverMarkerRef.current,
-        hasGoogle: !!window.google,
-        mapType,
-        reason: !driverMarkerRef.current ? 'No marker' : !window.google ? 'No Google' : mapType !== 'route' ? 'Wrong map type' : 'Unknown'
-      });
-      return;
-    }
-    
-    // Use live location if available, otherwise use booking location
-    const lat = liveDriverLocation?.latitude || booking.driverLocation?.latitude || booking.driverLocation?.lat;
-    const lng = liveDriverLocation?.longitude || booking.driverLocation?.longitude || booking.driverLocation?.lng;
-    const status = booking.bookingStatus?.toLowerCase();
-    
-    console.log('🗺️ LiveMapModalContent: Attempting to update marker:', {
-      bookingId: booking._id?.slice(-8),
-      lat,
-      lng,
-      status,
-      isLiveUpdate: !!liveDriverLocation,
-      hasMarker: !!driverMarkerRef.current,
-      hasRenderer: !!directionsRendererRef.current
+    // 4. Initial Route
+    const directionsService = new window.google.maps.DirectionsService();
+    const directionsRenderer = new window.google.maps.DirectionsRenderer({
+      map,
+      suppressMarkers: true,
+      polylineOptions: { strokeColor: status === 'accepted' ? '#10B981' : '#3B82F6', strokeWeight: 6, strokeOpacity: 0.8 }
     });
-    
-    if (lat && lng) {
-      console.log('✅ Updating Driver Marker on Map:', { lat, lng, isLive: !!liveDriverLocation });
-      const newPos = new window.google.maps.LatLng(lat, lng);
-      
-      // 🎬 Smooth marker animation
-      if (liveDriverLocation) {
-        // Animate marker movement for live updates
-        const currentPos = driverMarkerRef.current.getPosition();
-        if (currentPos) {
-          // Smooth transition
-          driverMarkerRef.current.setPosition(newPos);
-          // Optional: Add bounce animation for new update
-          driverMarkerRef.current.setAnimation(window.google.maps.Animation.BOUNCE);
-          setTimeout(() => {
-            driverMarkerRef.current.setAnimation(null);
-          }, 700);
-        } else {
-          driverMarkerRef.current.setPosition(newPos);
-        }
+    directionsRendererRef.current = directionsRenderer;
+
+    // Route sirf tab draw karo jab real driver location ho
+    if (hasRealDriverLocation) {
+      let origin = { lat: driverLat, lng: driverLng };
+      let destination = pickupPos;
+
+      if (status === 'accepted') {
+        destination = pickupPos;
+      } else if (status === 'ongoing' && dropPos) {
+        destination = dropPos;
       } else {
-        driverMarkerRef.current.setPosition(newPos);
+        directionsRenderer.setMap(null);
       }
-      
-      // 🔄 Update route line based on status
-      if (directionsRendererRef.current && mapInstanceRef.current) {
-        const pickupLat = booking.pickup?.latitude || booking.pickup?.lat;
-        const pickupLng = booking.pickup?.longitude || booking.pickup?.lng;
-        const dropLat = booking.drop?.latitude || booking.drop?.lat;
-        const dropLng = booking.drop?.longitude || booking.drop?.lng;
 
-        const directionsService = new window.google.maps.DirectionsService();
-        
-        if (status === 'accepted' && pickupLat && pickupLng) {
-          // Update route: Driver → Pickup
-          console.log('🔄 Updating ACCEPTED route with new driver position');
-          directionsService.route({
-            origin: newPos,
-            destination: { lat: pickupLat, lng: pickupLng },
-            travelMode: window.google.maps.TravelMode.DRIVING
-          }, (result, status) => { 
-            if (status === 'OK') {
-              directionsRendererRef.current.setDirections(result);
-              console.log('✅ ACCEPTED route updated!');
-            }
-          });
-        } else if (status === 'ongoing' && dropLat && dropLng) {
-          // Update route: Driver → Drop
-          console.log('🔄 Updating ONGOING route with new driver position');
-          directionsService.route({
-            origin: newPos,
-            destination: { lat: dropLat, lng: dropLng },
-            travelMode: window.google.maps.TravelMode.DRIVING
-          }, (result, status) => { 
-            if (status === 'OK') {
-              directionsRendererRef.current.setDirections(result);
-              console.log('✅ ONGOING route updated!');
-            }
-          });
-        }
-      }
-      
-      // 🎯 Optional: Center map on driver for live updates
-      if (liveDriverLocation && mapInstanceRef.current) {
-        mapInstanceRef.current.panTo(newPos);
+      if (destination && origin.lat !== destination.lat) {
+        directionsService.route({
+          origin, destination, travelMode: window.google.maps.TravelMode.DRIVING
+        }, (result, stat) => {
+          if (stat === 'OK') directionsRenderer.setDirections(result);
+        });
       }
     } else {
-      console.log('❌ No valid coordinates to update marker');
+      directionsRenderer.setMap(null);
+      console.log('⚠️ Driver location nahi hai abhi — waiting for WebSocket update...');
     }
-  }, [liveDriverLocation, booking.driverLocation, mapType, booking.bookingStatus]);
+
+    // Bounds fitting
+    const bounds = new window.google.maps.LatLngBounds();
+    bounds.extend(pickupPos);
+    if (dropPos) bounds.extend(dropPos);
+    if (hasRealDriverLocation) bounds.extend({ lat: driverLat, lng: driverLng });
+    map.fitBounds(bounds);
+
+    return () => {
+      if (directionsRendererRef.current) directionsRendererRef.current.setMap(null);
+      if (driverMarkerRef.current) driverMarkerRef.current.setMap(null);
+    };
+  }, [mapType, booking._id, booking.bookingStatus, booking.driverLocation?.latitude]);
+
+  const animationRef = useRef(null); // Previous animation cancel karne ke liye
+
+  // Handle Location Updates & Animations
+  useEffect(() => {
+    if (!driverMarkerRef.current || !window.google || !liveDriverLocation) return;
+
+    const lat = liveDriverLocation.latitude;
+    const lng = liveDriverLocation.longitude;
+    const heading = liveDriverLocation.heading || 0;
+    const newPos = new window.google.maps.LatLng(lat, lng);
+
+    // ✅ Agar marker pehle hidden tha, ab visible karo
+    if (!driverMarkerRef.current.getVisible()) {
+      console.log('🚗 Driver marker ab visible ho raha hai! First location received.');
+      driverMarkerRef.current.setVisible(true);
+      driverMarkerRef.current.setMap(mapInstanceRef.current);
+      driverMarkerRef.current.setPosition(newPos);
+    }
+
+    // ✅ Pichli animation cancel karo — naya update aagaya toh jitter mat ho
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+
+    // 🚗 Smooth Sliding Animation with Ease-In-Out
+    const startPos = driverMarkerRef.current.getPosition();
+    if (startPos) {
+      const startLat = startPos.lat();
+      const startLng = startPos.lng();
+      let step = 0;
+      const numSteps = 60; // ~1 second @ 60fps
+
+      const animate = () => {
+        step++;
+        if (step <= numSteps) {
+          const progress = step / numSteps;
+          // Ease-in-out for natural car movement feel
+          const eased = progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+          if (driverMarkerRef.current) {
+            driverMarkerRef.current.setPosition(
+              new window.google.maps.LatLng(
+                startLat + (lat - startLat) * eased,
+                startLng + (lng - startLng) * eased
+              )
+            );
+          }
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          // Exact final position
+          if (driverMarkerRef.current) driverMarkerRef.current.setPosition(newPos);
+          animationRef.current = null;
+        }
+      };
+
+      animationRef.current = requestAnimationFrame(animate);
+    } else {
+      driverMarkerRef.current.setPosition(newPos);
+    }
+
+    // Update Route Line
+    if (directionsRendererRef.current) {
+      const status = booking.bookingStatus?.toLowerCase();
+      let destination = status === 'accepted' ? pickupPos : (status === 'ongoing' ? dropPos : null);
+      
+      if (destination) {
+        const directionsService = new window.google.maps.DirectionsService();
+        directionsService.route({
+          origin: newPos,
+          destination,
+          travelMode: window.google.maps.TravelMode.DRIVING
+        }, (result, stat) => {
+          if (stat === 'OK') directionsRendererRef.current.setDirections(result);
+        });
+      }
+    }
+    
+    // Optional: Pan map slightly to keep driver in view if near edge
+    // ✅ getBounds() can be undefined if map tiles not yet loaded — safe check
+    const bounds = mapInstanceRef.current?.getBounds();
+    if (mapInstanceRef.current && bounds && !bounds.contains(newPos)) {
+      mapInstanceRef.current.panTo(newPos);
+    }
+
+  }, [liveDriverLocation]);
 
   return (
     <div className="relative">
-      <div ref={mapRef} className="w-full h-[300px] sm:h-[400px] md:h-[500px] rounded-lg sm:rounded-xl border-2 border-gray-200 overflow-hidden" />
-      
-      {/* Live Update Indicator */}
-      {mapType === 'route' && liveDriverLocation && (
-        <div className="absolute top-3 left-3 bg-green-500 text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-xs font-medium animate-pulse z-10">
-          <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-          <span>Live Tracking Active</span>
-        </div>
-      )}
-      
-      {/* Last Update Time */}
-      {mapType === 'route' && liveDriverLocation && (
-        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg text-xs font-medium text-gray-700 z-10">
-          🕐 Updated: {new Date(liveDriverLocation.timestamp || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+      <div ref={mapRef} className="w-full h-[400px] md:h-[500px] rounded-xl border-2 border-gray-200 overflow-hidden shadow-inner" />
+      {liveDriverLocation && (
+        <div className="absolute top-4 left-4 bg-green-600 text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold animate-pulse z-10 border-2 border-white">
+          <div className="w-2 h-2 bg-white rounded-full"></div>
+          <span>LIVE TRACKING</span>
         </div>
       )}
     </div>

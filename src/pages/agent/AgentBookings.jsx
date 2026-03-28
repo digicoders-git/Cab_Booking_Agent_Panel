@@ -54,8 +54,14 @@ export default function AgentBookings() {
             return {
               ...booking,
               bookingStatus: data.status,
+              // FIX: driverLocation aur assignedDriver._id bhi update karo
+              // Taaki map turant driver dikhaye bina refresh ke
+              driverLocation: data.driverLocation?.latitude
+                ? data.driverLocation
+                : booking.driverLocation,
               assignedDriver: data.driverName ? {
                 ...booking.assignedDriver,
+                _id: data.driverId || booking.assignedDriver?._id, // FIX: _id zaruri hai map tracking ke liye
                 name: data.driverName,
                 phone: data.driverPhone
               } : booking.assignedDriver
