@@ -156,7 +156,11 @@ const LiveMapModalContent = ({ booking, mapType }) => {
         ? { lat: driverLat, lng: driverLng } 
         : pickupPos, // temporary position, visible: false se chupaaya
       map: hasRealDriverLocation ? map : null, // ← Real location nahi hai toh map pe mat dikhao!
-      icon: { url: getCarIcon(0), scaledSize: new window.google.maps.Size(46, 46), anchor: new window.google.maps.Point(23, 23) },
+      icon: { 
+        url: getCarIcon(0), 
+        scaledSize: new window.google.maps.Size(60, 60), 
+        anchor: new window.google.maps.Point(30, 30) 
+      },
       zIndex: 1000,
       visible: hasRealDriverLocation // ← Real location nahi toh invisible
     });
@@ -227,8 +231,8 @@ const LiveMapModalContent = ({ booking, mapType }) => {
         const iconUrl = getCarIcon(heading);
         driverMarkerRef.current.setIcon({
             url: iconUrl,
-            scaledSize: new window.google.maps.Size(46, 46),
-            anchor: new window.google.maps.Point(23, 23)
+            scaledSize: new window.google.maps.Size(60, 60), // Match SVG size
+            anchor: new window.google.maps.Point(30, 30) // Center of 60x60
         });
     }
 
