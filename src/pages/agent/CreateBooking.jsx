@@ -1,7 +1,7 @@
 // src/pages/agent/CreateBooking.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { agentService } from '../../api/agentApi';
+import { agentService, API_BASE_URL } from '../../api/agentApi';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import {
@@ -772,18 +772,19 @@ export default function CreateBooking() {
                                                     <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center overflow-hidden">
                                                         {cab.image ? (
                                                             <img 
-                                                                src={cab.image} 
+                                                                src={cab.image.startsWith('http') ? cab.image : `${API_BASE_URL}/uploads/${cab.image}`} 
                                                                 alt={cab.name}
-                                                                className="w-full h-full object-cover"
+                                                                className="w-full h-full object-contain"
                                                                 onError={(e) => {
                                                                     e.target.style.display = 'none';
-                                                                    e.target.nextSibling.style.display = 'flex';
+                                                                    const icon = e.target.parentElement.querySelector('.fallback-icon');
+                                                                    if (icon) icon.style.display = 'block';
                                                                 }}
                                                             />
                                                         ) : null}
                                                         <FaCar 
                                                             size={28} 
-                                                            className="text-blue-600" 
+                                                            className="text-blue-600 fallback-icon" 
                                                             style={{ display: cab.image ? 'none' : 'block' }}
                                                         />
                                                     </div>
@@ -951,18 +952,19 @@ export default function CreateBooking() {
                                         <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center overflow-hidden">
                                             {selectedCab.image ? (
                                                 <img 
-                                                    src={selectedCab.image} 
+                                                    src={selectedCab.image.startsWith('http') ? selectedCab.image : `${API_BASE_URL}/uploads/${selectedCab.image}`} 
                                                     alt={selectedCab.name}
-                                                    className="w-full h-full object-cover"
+                                                    className="w-full h-full object-contain"
                                                     onError={(e) => {
                                                         e.target.style.display = 'none';
-                                                        e.target.nextSibling.style.display = 'flex';
+                                                        const icon = e.target.parentElement.querySelector('.fallback-icon');
+                                                        if (icon) icon.style.display = 'block';
                                                     }}
                                                 />
                                             ) : null}
                                             <FaCar 
                                                 size={24} 
-                                                className="text-purple-600" 
+                                                className="text-purple-600 fallback-icon" 
                                                 style={{ display: selectedCab.image ? 'none' : 'block' }}
                                             />
                                         </div>

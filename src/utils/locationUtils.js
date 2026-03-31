@@ -13,7 +13,7 @@ const GOOGLE_MAPS_API = {
 
       const geocoder = new window.google.maps.Geocoder();
       geocoder.geocode(
-        { 
+        {
           address: address,
           componentRestrictions: { country: 'IN' }
         },
@@ -61,14 +61,13 @@ const GOOGLE_MAPS_API = {
       service.getPlacePredictions(
         {
           input: query,
-          componentRestrictions: { country: 'in' },
-          types: ['geocode']
+          componentRestrictions: { country: 'in' }
         },
         (predictions, status) => {
           console.log('📡 Google API Status:', status);
           console.log('📡 Predictions:', predictions);
           console.log('📡 Status Code:', window.google.maps.places.PlacesServiceStatus);
-          
+
           if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
             const results = predictions.map(prediction => ({
               description: prediction.description,

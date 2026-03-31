@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { FaChevronDown, FaChevronUp, FaSearch, FaTimes, FaSync, FaBan, FaMapMarkedAlt } from 'react-icons/fa';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Phone, MapPin } from 'lucide-react';
-import { agentService } from '../api/agentApi';
+import { agentService, API_BASE_URL } from '../api/agentApi';
 import { toast } from 'sonner';
 
 // --- LIVE MAP COMPONENT ---
@@ -28,6 +28,24 @@ const LiveMapModalContent = ({ booking, mapType }) => {
 
   const pickupPos = getCoords(booking.pickup, 'pickup');
   const dropPos = getCoords(booking.drop, 'drop');
+
+  // Driver Marker Icon (Category Image or SVG fallback)
+  const getCarIcon = (heading = 0) => {
+    if (booking.carCategory?.image) {
+      return `${API_BASE_URL}/uploads/${booking.carCategory.image}`;
+    }
+    
+    const svg = `
+      <svg width="40" height="40" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <g transform="rotate(${heading} 24 24)">
+          <ellipse cx="24" cy="42" rx="16" ry="3" fill="rgba(0,0,0,0.2)"/>
+          <path d="M12 28 L12 32 C12 33 13 34 14 34 L16 34 C17 34 18 33 18 32 L18 30 L30 30 L30 32 C30 33 31 34 32 34 L34 34 C35 34 36 33 36 32 L36 28 L38 28 C39 28 40 27 40 26 L40 20 C40 19 39.5 18 38.5 17 L35 12 C34.5 11 33.5 10 32 10 L16 10 C14.5 10 13.5 11 13 12 L9.5 17 C8.5 18 8 19 8 20 L8 26 C8 27 9 28 10 28 L12 28 Z" fill="#3B82F6" stroke="#1E40AF" stroke-width="1.5"/>
+          <path d="M14 16 L18 12 L30 12 L34 16 L34 20 L14 20 Z" fill="#93C5FD" stroke="#1E40AF" stroke-width="1"/>
+        </g>
+      </svg>
+    `;
+    return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+  };
 
   // ✅ FIX 1: Watch booking.driverLocation prop directly
   // AgentBookings.jsx WebSocket se update karta hai booking.driverLocation
@@ -128,18 +146,7 @@ const LiveMapModalContent = ({ booking, mapType }) => {
     }
 
     // 3. Driver Marker (Custom Car SVG)
-    const getCarIcon = (heading = 0) => {
-      const svg = `
-        <svg width="40" height="40" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-          <g transform="rotate(${heading} 24 24)">
-            <ellipse cx="24" cy="42" rx="16" ry="3" fill="rgba(0,0,0,0.2)"/>
-            <path d="M12 28 L12 32 C12 33 13 34 14 34 L16 34 C17 34 18 33 18 32 L18 30 L30 30 L30 32 C30 33 31 34 32 34 L34 34 C35 34 36 33 36 32 L36 28 L38 28 C39 28 40 27 40 26 L40 20 C40 19 39.5 18 38.5 17 L35 12 C34.5 11 33.5 10 32 10 L16 10 C14.5 10 13.5 11 13 12 L9.5 17 C8.5 18 8 19 8 20 L8 26 C8 27 9 28 10 28 L12 28 Z" fill="#3B82F6" stroke="#1E40AF" stroke-width="1.5"/>
-            <path d="M14 16 L18 12 L30 12 L34 16 L34 20 L14 20 Z" fill="#93C5FD" stroke="#1E40AF" stroke-width="1"/>
-          </g>
-        </svg>
-      `;
-      return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
-    };
+    // 3. Driver Marker Icon (Category Image or SVG fallback)
 
     // ✅ FIX 4: Sirf real driver location ho toh marker dikhao, warna hidden
     const driverMarker = new window.google.maps.Marker({
@@ -147,7 +154,7 @@ const LiveMapModalContent = ({ booking, mapType }) => {
         ? { lat: driverLat, lng: driverLng } 
         : pickupPos, // temporary position, visible: false se chupaaya
       map: hasRealDriverLocation ? map : null, // ← Real location nahi hai toh map pe mat dikhao!
-      icon: { url: getCarIcon(0), scaledSize: new window.google.maps.Size(40, 40), anchor: new window.google.maps.Point(20, 20) },
+      icon: { url: getCarIcon(0), scaledSize: new window.google.maps.Size(46, 46), anchor: new window.google.maps.Point(23, 23) },
       zIndex: 1000,
       visible: hasRealDriverLocation // ← Real location nahi toh invisible
     });
@@ -199,7 +206,7 @@ const LiveMapModalContent = ({ booking, mapType }) => {
       if (directionsRendererRef.current) directionsRendererRef.current.setMap(null);
       if (driverMarkerRef.current) driverMarkerRef.current.setMap(null);
     };
-  }, [mapType, booking._id, booking.bookingStatus, booking.driverLocation?.latitude]);
+  }, [mapType, booking._id, booking.bookingStatus]); // REMOVED driverLocation dependency
 
   const animationRef = useRef(null); // Previous animation cancel karne ke liye
 
@@ -211,6 +218,16 @@ const LiveMapModalContent = ({ booking, mapType }) => {
     const lng = liveDriverLocation.longitude;
     const heading = liveDriverLocation.heading || 0;
     const newPos = new window.google.maps.LatLng(lat, lng);
+
+    // ✅ Update Car Rotation immediately (Only once per location hit)
+    if (driverMarkerRef.current) {
+        const iconUrl = getCarIcon(heading);
+        driverMarkerRef.current.setIcon({
+            url: iconUrl,
+            scaledSize: new window.google.maps.Size(46, 46),
+            anchor: new window.google.maps.Point(23, 23)
+        });
+    }
 
     // ✅ Agar marker pehle hidden tha, ab visible karo
     if (!driverMarkerRef.current.getVisible()) {
