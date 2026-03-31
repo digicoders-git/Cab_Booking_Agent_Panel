@@ -31,16 +31,22 @@ const LiveMapModalContent = ({ booking, mapType }) => {
 
   // Driver Marker Icon (Category Image or SVG fallback)
   const getCarIcon = (heading = 0) => {
-    if (booking.carCategory?.image) {
-      return `${API_BASE_URL}/uploads/${booking.carCategory.image}`;
-    }
-    
+    const carImg = booking.carCategory?.image 
+      ? `${API_BASE_URL}/uploads/${booking.carCategory.image}`
+      : null;
+
+    // We wrap the image in an SVG to allow rotation via transform
     const svg = `
-      <svg width="40" height="40" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-        <g transform="rotate(${heading} 24 24)">
-          <ellipse cx="24" cy="42" rx="16" ry="3" fill="rgba(0,0,0,0.2)"/>
-          <path d="M12 28 L12 32 C12 33 13 34 14 34 L16 34 C17 34 18 33 18 32 L18 30 L30 30 L30 32 C30 33 31 34 32 34 L34 34 C35 34 36 33 36 32 L36 28 L38 28 C39 28 40 27 40 26 L40 20 C40 19 39.5 18 38.5 17 L35 12 C34.5 11 33.5 10 32 10 L16 10 C14.5 10 13.5 11 13 12 L9.5 17 C8.5 18 8 19 8 20 L8 26 C8 27 9 28 10 28 L12 28 Z" fill="#3B82F6" stroke="#1E40AF" stroke-width="1.5"/>
-          <path d="M14 16 L18 12 L30 12 L34 16 L34 20 L14 20 Z" fill="#93C5FD" stroke="#1E40AF" stroke-width="1"/>
+      <svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+        <g transform="rotate(${heading} 30 30)">
+          ${carImg ? 
+            `<image href="${carImg}" x="5" y="5" height="50" width="50" />` :
+            `<g>
+              <ellipse cx="30" cy="50" rx="18" ry="4" fill="rgba(0,0,0,0.2)"/>
+              <path d="M15 35 L15 40 C15 41 16 42 17 42 L19 42 C20 42 21 41 21 40 L21 38 L39 38 L39 40 C39 41 40 42 41 42 L43 42 C44 42 45 41 45 40 L45 35 L47 35 C48 35 49 34 49 33 L49 26 C49 25 48.5 24 47.5 22.5 L43 16 C42.5 15 41.5 14 40 14 L20 14 C18.5 14 17.5 15 17 16 L12.5 22.5 C11.5 24 11 25 11 26 L11 33 C11 34 12 35 13 35 L15 35 Z" fill="#3B82F6" stroke="#1E40AF" stroke-width="1.5"/>
+              <path d="M18 21 L22 16 L38 16 L42 21 L42 26 L18 26 Z" fill="#93C5FD" stroke="#1E40AF" stroke-width="1"/>
+            </g>`
+          }
         </g>
       </svg>
     `;
