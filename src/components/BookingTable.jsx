@@ -166,6 +166,7 @@ const LiveMapModalContent = ({ booking, mapType }) => {
     const directionsRenderer = new window.google.maps.DirectionsRenderer({
       map,
       suppressMarkers: true,
+      preserveViewport: true, // ✅ FIX: Map resets zoom every update because of this. Set to true.
       polylineOptions: { strokeColor: status === 'accepted' ? '#10B981' : '#3B82F6', strokeWeight: 6, strokeOpacity: 0.8 }
     });
     directionsRendererRef.current = directionsRenderer;
@@ -293,17 +294,20 @@ const LiveMapModalContent = ({ booking, mapType }) => {
           destination,
           travelMode: window.google.maps.TravelMode.DRIVING
         }, (result, stat) => {
+          // preserveViewport: true upar set kiya hai, toh ye map ko move nahi karega
           if (stat === 'OK') directionsRendererRef.current.setDirections(result);
         });
       }
     }
     
-    // Optional: Pan map slightly to keep driver in view if near edge
-    // ✅ getBounds() can be undefined if map tiles not yet loaded — safe check
+    // ❌ REMOVED: Automatic panTo interference
+    // Iski wajah se user jab zoom/pan karta tha toh map wapas snap ho jata tha.
+    /*
     const bounds = mapInstanceRef.current?.getBounds();
     if (mapInstanceRef.current && bounds && !bounds.contains(newPos)) {
       mapInstanceRef.current.panTo(newPos);
     }
+    */
 
   }, [liveDriverLocation]);
 
