@@ -1,7 +1,7 @@
 // src/pages/agent/AgentProfile.jsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { agentService } from '../../api/agentApi';
+import { agentService, API_BASE_URL } from '../../api/agentApi';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import {
@@ -86,7 +86,7 @@ export default function AgentProfile() {
       setCity(agentData.city || '');
       setState(agentData.state || '');
       setPincode(agentData.pincode || '');
-      setImagePreview(agentData.image ? `http://localhost:5000/uploads/${agentData.image}` : null);
+      setImagePreview(agentData.image ? `${API_BASE_URL}/uploads/${agentData.image}` : null);
     } catch (err) {
       toast.error(err?.response?.data?.message || err?.message || 'Failed to load profile');
     } finally {
@@ -165,7 +165,7 @@ export default function AgentProfile() {
     setCity(agent?.city || '');
     setState(agent?.state || '');
     setPincode(agent?.pincode || '');
-    setImagePreview(agent?.image ? `http://localhost:5000/uploads/${agent.image}` : null);
+    setImagePreview(agent?.image ? `${API_BASE_URL}/uploads/${agent.image}` : null);
   };
 
   if (loading) {

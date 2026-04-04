@@ -1,7 +1,14 @@
 // src/pages/agent/AgentDashboard.jsx
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { agentService } from '../../api/agentApi';
+import { agentService, API_BASE_URL } from '../../api/agentApi';
+
+// Helper function to get full image URL
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('http')) return imagePath; // Already full URL
+  return `${API_BASE_URL}/uploads/${imagePath}`;
+};
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 import Highcharts from 'highcharts';
@@ -91,7 +98,7 @@ const ProfileCard = ({ profile }) => {
         <div className="relative">
           {profile.image ? (
             <img 
-              src={profile.image} 
+              src={getImageUrl(profile.image)} 
               alt={profile.name}
               className="w-20 h-20 rounded-2xl object-cover shadow-lg"
               onError={(e) => {
