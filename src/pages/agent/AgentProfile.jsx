@@ -9,7 +9,7 @@ import {
   FaGlobe, FaMapPin, FaPercent, FaWallet, FaMoneyBillWave,
   FaCamera, FaSave, FaSync, FaArrowLeft, FaCheckCircle,
   FaTimes, FaEdit, FaIdCard, FaBuilding, FaStar,
-  FaShieldAlt, FaCreditCard, FaHistory
+  FaShieldAlt, FaCreditCard, FaHistory, FaCar
 } from 'react-icons/fa';
 import {
   User, Mail, Phone, MapPin, Globe, Lock, Upload,
@@ -70,12 +70,32 @@ export default function AgentProfile() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
 
+  // Document states
+  const [aadharFile, setAadharFile] = useState(null);
+  const [aadharPreview, setAadharPreview] = useState(null);
+  const [panFile, setPanFile] = useState(null);
+  const [panPreview, setPanPreview] = useState(null);
+
+  // Bank form states
+  const [accountNumber, setAccountNumber] = useState('');
+  const [ifscCode, setIfscCode] = useState('');
+  const [accountHolderName, setAccountHolderName] = useState('');
+  const [bankName, setBankName] = useState('');
+
   // Fetch agent profile
   const fetchProfile = async () => {
     try {
       setLoading(true);
       const data = await agentService.getProfile();
       const agentData = data?.agent || data || {};
+
+      console.log('🔍 Profile API Response:', data);
+      console.log('👤 Agent Data:', agentData);
+      console.log('📸 Image:', agentData.image);
+      console.log('🏦 Bank Details:', agentData.bankDetails);
+      console.log('📄 Documents:', agentData.documents);
+      console.log('📊 Total Bookings:', agentData.totalBookings);
+      console.log('💰 Total Earnings:', agentData.totalEarnings);
 
       setAgent(agentData);
 
@@ -87,6 +107,15 @@ export default function AgentProfile() {
       setState(agentData.state || '');
       setPincode(agentData.pincode || '');
       setImagePreview(agentData.image ? `${API_BASE_URL}/uploads/${agentData.image}` : null);
+
+      // Set bank values
+      setAccountNumber(agentData.bankDetails?.accountNumber || '');
+      setIfscCode(agentData.bankDetails?.ifscCode || '');
+      setAccountHolderName(agentData.bankDetails?.accountHolderName || '');
+      setBankName(agentData.bankDetails?.bankName || '');
+
+      setAadharPreview(agentData.documents?.aadhar ? `${API_BASE_URL}/uploads/${agentData.documents.aadhar}` : null);
+      setPanPreview(agentData.documents?.pan ? `${API_BASE_URL}/uploads/${agentData.documents.pan}` : null);
     } catch (err) {
       toast.error(err?.response?.data?.message || err?.message || 'Failed to load profile');
     } finally {
@@ -105,6 +134,30 @@ export default function AgentProfile() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAadharChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAadharFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAadharPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePanChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setPanFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPanPreview(reader.result);
       };
       reader.readAsDataURL(file);
     }
@@ -131,9 +184,21 @@ export default function AgentProfile() {
       if (pincode !== agent?.pincode) formData.append('pincode', pincode);
       if (password) formData.append('password', password);
 
+      // Append bank fields
+      if (accountNumber !== agent?.bankDetails?.accountNumber) formData.append('accountNumber', accountNumber);
+      if (ifscCode !== agent?.bankDetails?.ifscCode) formData.append('ifscCode', ifscCode);
+      if (accountHolderName !== agent?.bankDetails?.accountHolderName) formData.append('accountHolderName', accountHolderName);
+      if (bankName !== agent?.bankDetails?.bankName) formData.append('bankName', bankName);
+
       // Append image file if selected
       if (selectedFile) {
         formData.append('image', selectedFile);
+      }
+      if (aadharFile) {
+        formData.append('aadhar', aadharFile);
+      }
+      if (panFile) {
+        formData.append('pan', panFile);
       }
 
       const res = await agentService.updateProfile(formData);
@@ -166,6 +231,15 @@ export default function AgentProfile() {
     setState(agent?.state || '');
     setPincode(agent?.pincode || '');
     setImagePreview(agent?.image ? `${API_BASE_URL}/uploads/${agent.image}` : null);
+    setAccountNumber(agent?.bankDetails?.accountNumber || '');
+    setIfscCode(agent?.bankDetails?.ifscCode || '');
+    setAccountHolderName(agent?.bankDetails?.accountHolderName || '');
+    setBankName(agent?.bankDetails?.bankName || '');
+
+    setAadharFile(null);
+    setAadharPreview(agent?.documents?.aadhar ? `${API_BASE_URL}/uploads/${agent.documents.aadhar}` : null);
+    setPanFile(null);
+    setPanPreview(agent?.documents?.pan ? `${API_BASE_URL}/uploads/${agent.documents.pan}` : null);
   };
 
   if (loading) {
@@ -305,16 +379,15 @@ export default function AgentProfile() {
                     <p className="text-xs text-gray-500">Wallet</p>
                     <p className="text-xl font-bold text-green-600">₹{agent?.walletBalance?.toLocaleString() || 0}</p>
                   </div>
-                </div>
-
-                {/* Total Earnings */}
-                <div className="mt-3 bg-purple-50 rounded-xl p-4 border border-purple-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FaMoneyBillWave className="text-purple-600" size={20} />
-                      <span className="text-xs text-gray-500">Total Earnings</span>
-                    </div>
-                    <p className="text-lg font-bold text-purple-600">₹{agent?.totalEarnings?.toLocaleString() || 0}</p>
+                  <div className="bg-purple-50 rounded-xl p-4 text-center border border-purple-100">
+                    <FaMoneyBillWave className="text-purple-600 mx-auto mb-2" size={20} />
+                    <p className="text-xs text-gray-500">Total Earnings</p>
+                    <p className="text-xl font-bold text-purple-600">₹{agent?.totalEarnings?.toLocaleString() || 0}</p>
+                  </div>
+                  <div className="bg-orange-50 rounded-xl p-4 text-center border border-orange-100">
+                    <FaCar className="text-orange-600 mx-auto mb-2" size={20} />
+                    <p className="text-xs text-gray-500">Total Bookings</p>
+                    <p className="text-xl font-bold text-orange-600">{agent?.totalBookings || 0}</p>
                   </div>
                 </div>
 
@@ -379,8 +452,35 @@ export default function AgentProfile() {
                   />
                 </InfoRow>
 
-                {/* Email (Read-only) */}
-                <InfoRow icon={Mail} label="Email Address" value={agent?.email} />
+                {/* Email (Read-only - Cannot be changed) */}
+                <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                  <div className="p-2 bg-gray-200 rounded-lg text-gray-500">
+                    <Mail size={16} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email Address</p>
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 rounded-full">
+                        <Lock size={10} className="text-gray-500" />
+                        <span className="text-xs text-gray-500 font-medium">Locked</span>
+                      </div>
+                    </div>
+                    <div className="relative mt-2">
+                      <input
+                        type="email"
+                        value={agent?.email || ''}
+                        disabled
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-100 text-gray-600 cursor-not-allowed text-sm font-medium"
+                        placeholder="Email address"
+                      />
+                      <Lock size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
+                      <FaShieldAlt size={10} />
+                      Email cannot be changed for security reasons
+                    </p>
+                  </div>
+                </div>
 
                 {/* Address */}
                 <InfoRow icon={MapPin} label="Address" value={address} isEdit={editMode}>
@@ -471,6 +571,191 @@ export default function AgentProfile() {
                   </div>
                 )}
 
+                {/* Bank Details Section */}
+                <div className="mt-8 p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                  <div className="flex items-center gap-2 mb-4">
+                    <CreditCard size={18} className="text-green-600" />
+                    <h4 className="text-sm font-semibold text-gray-800">Bank Details</h4>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Bank Name</p>
+                      {editMode ? (
+                        <input
+                          type="text"
+                          value={bankName}
+                          onChange={(e) => setBankName(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-green-500"
+                          placeholder="Bank Name"
+                        />
+                      ) : (
+                        <p className="font-semibold text-gray-900">{agent?.bankDetails?.bankName || '—'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Account Holder</p>
+                      {editMode ? (
+                        <input
+                          type="text"
+                          value={accountHolderName}
+                          onChange={(e) => setAccountHolderName(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-green-500"
+                          placeholder="Account Holder Name"
+                        />
+                      ) : (
+                        <p className="font-semibold text-gray-900">{agent?.bankDetails?.accountHolderName || '—'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Account Number</p>
+                      {editMode ? (
+                        <input
+                          type="text"
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-green-500"
+                          placeholder="Account Number"
+                        />
+                      ) : (
+                        <p className="font-semibold text-gray-900">
+                          {agent?.bankDetails?.accountNumber ? `****${agent.bankDetails.accountNumber.slice(-4)}` : '—'}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">IFSC Code</p>
+                      {editMode ? (
+                        <input
+                          type="text"
+                          value={ifscCode}
+                          onChange={(e) => setIfscCode(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-green-500"
+                          placeholder="IFSC Code"
+                        />
+                      ) : (
+                        <p className="font-semibold text-gray-900">{agent?.bankDetails?.ifscCode || '—'}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Documents Section */}
+                <div className="mt-6 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FaIdCard size={18} className="text-blue-600" />
+                    <h4 className="text-sm font-semibold text-gray-800">Documents</h4>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Aadhar Card */}
+                    <div className="group relative bg-white rounded-xl border-2 border-blue-100 hover:border-blue-300 transition-all overflow-hidden">
+                      <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
+                        {aadharPreview ? (
+                          <img 
+                            src={aadharPreview}
+                            alt="Aadhar Card"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div className={aadharPreview ? "hidden w-full h-full items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200" : "w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200"}>
+                          <FaIdCard size={48} className="text-blue-600 opacity-50" />
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">Aadhar Card</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Identity Proof</p>
+                          </div>
+                          {editMode ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = 'image/*';
+                                input.onchange = handleAadharChange;
+                                input.click();
+                              }}
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-all flex items-center gap-1"
+                            >
+                              <Upload size={12} />
+                              Change
+                            </button>
+                          ) : (
+                            <a 
+                              href={aadharPreview}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-all flex items-center gap-1"
+                            >
+                              <FaIdCard size={12} />
+                              View
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PAN Card */}
+                    <div className="group relative bg-white rounded-xl border-2 border-blue-100 hover:border-blue-300 transition-all overflow-hidden">
+                      <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
+                        {panPreview ? (
+                          <img 
+                            src={panPreview}
+                            alt="PAN Card"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div className={panPreview ? "hidden w-full h-full items-center justify-center bg-gradient-to-br from-purple-100 to-purple-200" : "w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-100 to-purple-200"}>
+                          <FaCreditCard size={48} className="text-purple-600 opacity-50" />
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">PAN Card</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Tax Identification</p>
+                          </div>
+                          {editMode ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = 'image/*';
+                                input.onchange = handlePanChange;
+                                input.click();
+                              }}
+                              className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 transition-all flex items-center gap-1"
+                            >
+                              <Upload size={12} />
+                              Change
+                            </button>
+                          ) : (
+                            <a 
+                              href={panPreview}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 transition-all flex items-center gap-1"
+                            >
+                              <FaCreditCard size={12} />
+                              View
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Action Buttons - Only in edit mode */}
                 {editMode && (
                   <div className="flex gap-4 pt-6 mt-6 border-t border-gray-200">
@@ -504,7 +789,7 @@ export default function AgentProfile() {
               </form>
 
               {/* Account Information Footer */}
-              <div className="mt-8 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+              <div className="mt-6 p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                 <div className="flex items-center gap-2 mb-3">
                   <Shield size={16} className="text-blue-600" />
                   <h4 className="text-sm font-semibold text-gray-700">Account Information</h4>
@@ -530,6 +815,20 @@ export default function AgentProfile() {
                         month: 'short',
                         day: 'numeric'
                       }) : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FaUser size={14} className="text-gray-400" />
+                    <span className="text-gray-600">Agent ID:</span>
+                    <span className="font-medium text-gray-900 font-mono text-xs">
+                      {agent?._id?.slice(-8) || '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FaHistory size={14} className="text-gray-400" />
+                    <span className="text-gray-600">Total Bookings:</span>
+                    <span className="font-medium text-gray-900">
+                      {agent?.totalBookings || 0}
                     </span>
                   </div>
                 </div>
