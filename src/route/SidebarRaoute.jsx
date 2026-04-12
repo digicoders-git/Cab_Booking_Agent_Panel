@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { FaTachometerAlt, FaCar, FaWallet, FaBell, FaUser, FaPlusCircle, FaHeadset, FaFileAlt } from "react-icons/fa";
+import { FaTachometerAlt, FaCar, FaWallet, FaBell, FaUser, FaPlusCircle, FaHeadset, FaFileAlt, FaTruck } from "react-icons/fa";
 
 const AgentDashboard = lazy(() => import("../pages/agent/AgentDashboard"));
 const AgentBookings = lazy(() => import("../pages/agent/AgentBookings"));
@@ -9,10 +9,14 @@ const AgentProfile = lazy(() => import("../pages/agent/AgentProfile"));
 const CreateBooking = lazy(() => import("../pages/agent/CreateBooking"));
 const Support = lazy(() => import("../pages/agent/Support"));
 const Report = lazy(() => import("../pages/agent/Report"));
+const CreateBulkBooking = lazy(() => import("../pages/agent/CreateBulkBooking"));
+const MyBulkBookings = lazy(() => import("../pages/agent/MyBulkBookings"));
 
 const routes = [
   { path: "/agent/dashboard", component: AgentDashboard, name: "Dashboard", icon: FaTachometerAlt },
   { path: "/agent/bookings", component: AgentBookings, name: "Bookings", icon: FaCar },
+  { path: "/agent/create-bulk-booking", component: CreateBulkBooking, name: "New Bulk Ride", icon: FaPlusCircle },
+  { path: "/agent/my-bulk-bookings", component: MyBulkBookings, name: "Bulk Rides", icon: FaTruck },
   { path: "/agent/create-booking", component: CreateBooking, name: "New Booking", icon: FaPlusCircle, hide: true },
   { path: "/agent/wallet", component: AgentWallet, name: "Wallet", icon: FaWallet },
   { path: "/agent/support", component: Support, name: "Support", icon: FaHeadset },

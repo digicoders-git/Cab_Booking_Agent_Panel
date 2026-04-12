@@ -99,6 +99,28 @@ export const agentService = {
       responseType: 'blob'
     });
     return response;
+  },
+
+  // Car Categories
+  getAllCarCategories: async () => {
+    const response = await agentApi.get('/api/car-categories/active');
+    return response.data;
+  },
+
+  // Bulk Bookings
+  createBulkBooking: async (data) => {
+    const response = await agentApi.post('/api/bulk-bookings/create', data);
+    return response.data;
+  },
+
+  getMyBulkBookings: async () => {
+    const response = await agentApi.get('/api/bulk-bookings/my-requests');
+    return response.data;
+  },
+
+  cancelBulkBooking: async (id) => {
+    const response = await agentApi.delete(`/api/bulk-bookings/cancel/${id}`);
+    return response.data;
   }
 
 };
