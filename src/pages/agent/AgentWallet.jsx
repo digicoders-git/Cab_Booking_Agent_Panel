@@ -467,60 +467,76 @@ export default function AgentWallet() {
         </div>
       </div>
 
-      {/* Balance Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-white/20 rounded-xl">
-              <Wallet size={24} />
-            </div>
-            <span className="text-xs bg-white/20 px-3 py-1 rounded-full">Available Balance</span>
+      {/* 6 Cards - Single Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
+        {/* Card 1: Wallet Balance */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 hover:shadow-lg hover:border-blue-200 transition-all cursor-pointer">
+          <div className="p-2 bg-blue-50 rounded-xl w-fit mb-3">
+            <Wallet size={18} className="text-blue-600" />
           </div>
-          <p className="text-4xl font-bold">₹{walletBalance.toLocaleString()}</p>
-          <p className="text-blue-100 text-sm mt-2">Ready for withdrawal</p>
+          <p className="text-2xl font-bold text-gray-900">₹{walletBalance.toLocaleString()}</p>
+          <p className="text-[11px] text-gray-400 mt-1">Ready for withdrawal</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">Wallet Balance</p>
         </div>
 
-        <div className="bg-gradient-to-br from-green-600 to-teal-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-white/20 rounded-xl">
-              <DollarSign size={24} />
-            </div>
-            <span className="text-xs bg-white/20 px-3 py-1 rounded-full">Lifetime</span>
+        {/* Card 2: Total Earnings */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 hover:shadow-lg hover:border-green-200 transition-all cursor-pointer">
+          <div className="p-2 bg-green-50 rounded-xl w-fit mb-3">
+            <DollarSign size={18} className="text-green-600" />
           </div>
-          <p className="text-4xl font-bold">₹{totalEarnings.toLocaleString()}</p>
-          <p className="text-green-100 text-sm mt-2">Total earnings</p>
+          <p className="text-2xl font-bold text-gray-900">₹{totalEarnings.toLocaleString()}</p>
+          <p className="text-[11px] text-gray-400 mt-1">Lifetime</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">Total Earnings</p>
         </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Credits"
-          value={`₹${stats.totalCredits.toLocaleString()}`}
-          icon={TrendingUp}
-          color={CHART_COLORS.success}
-          trend={12}
-        />
-        <StatCard
-          label="Total Debits"
-          value={`₹${stats.totalDebits.toLocaleString()}`}
-          icon={TrendingDown}
-          color={CHART_COLORS.danger}
-          trend={-5}
-        />
-        <StatCard
-          label="Pending Amount"
-          value={`₹${stats.pendingAmount.toLocaleString()}`}
-          icon={Clock}
-          color={CHART_COLORS.warning}
-        />
-        <StatCard
-          label="Net Flow"
-          value={`₹${stats.netFlow.toLocaleString()}`}
-          icon={Activity}
-          color={stats.netFlow >= 0 ? CHART_COLORS.success : CHART_COLORS.danger}
-          trend={stats.netFlow >= 0 ? 15 : -8}
-        />
+        {/* Card 3: Total Credits */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 hover:shadow-lg hover:border-green-200 transition-all cursor-pointer">
+          <div className="flex items-start justify-between mb-3">
+            <div className="p-2 rounded-xl" style={{ backgroundColor: CHART_COLORS.success + '15' }}>
+              <TrendingUp size={18} style={{ color: CHART_COLORS.success }} />
+            </div>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-600">↑ 12%</span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">₹{stats.totalCredits.toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Total Credits</p>
+        </div>
+
+        {/* Card 4: Total Debits */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 hover:shadow-lg hover:border-red-200 transition-all cursor-pointer">
+          <div className="flex items-start justify-between mb-3">
+            <div className="p-2 rounded-xl" style={{ backgroundColor: CHART_COLORS.danger + '15' }}>
+              <TrendingDown size={18} style={{ color: CHART_COLORS.danger }} />
+            </div>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-600">↓ 5%</span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">₹{stats.totalDebits.toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Total Debits</p>
+        </div>
+
+        {/* Card 5: Pending Amount */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 hover:shadow-lg hover:border-yellow-200 transition-all cursor-pointer">
+          <div className="flex items-start justify-between mb-3">
+            <div className="p-2 rounded-xl" style={{ backgroundColor: CHART_COLORS.warning + '15' }}>
+              <Clock size={18} style={{ color: CHART_COLORS.warning }} />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">₹{stats.pendingAmount.toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Pending Amount</p>
+        </div>
+
+        {/* Card 6: Net Flow */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 hover:shadow-lg hover:border-blue-200 transition-all cursor-pointer">
+          <div className="flex items-start justify-between mb-3">
+            <div className="p-2 rounded-xl" style={{ backgroundColor: (stats.netFlow >= 0 ? CHART_COLORS.success : CHART_COLORS.danger) + '15' }}>
+              <Activity size={18} style={{ color: stats.netFlow >= 0 ? CHART_COLORS.success : CHART_COLORS.danger }} />
+            </div>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${stats.netFlow >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+              {stats.netFlow >= 0 ? '↑ 15%' : '↓ 8%'}
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">₹{stats.netFlow.toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Net Flow</p>
+        </div>
       </div>
 
       {/* Chart Selector */}
@@ -567,20 +583,7 @@ export default function AgentWallet() {
           </ChartCard>
         )}
 
-        {/* Chart 3: Status Distribution */}
-        {(selectedChart === 'all' || selectedChart === 'distribution') && (
-          <ChartCard title="Status Distribution" icon={Target} subtitle="Completed vs Pending">
-            {statusData.length > 0 ? (
-              <HighchartsReact highcharts={Highcharts} options={pieOptions(statusData, 'Status')} />
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
-                No data available
-              </div>
-            )}
-          </ChartCard>
-        )}
-
-        {/* Chart 4: Monthly Trend */}
+{/* Chart 4: Monthly Trend */}
         {(selectedChart === 'all' || selectedChart === 'monthly') && monthlyData.length > 0 && (
           <ChartCard title="Monthly Trend" icon={BarChart3} subtitle="Credits vs Debits over time">
             <HighchartsReact highcharts={Highcharts} options={barOptions} />
@@ -597,54 +600,45 @@ export default function AgentWallet() {
 
       {/* Withdraw Form */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Withdrawal Form */}
-        <div className="space-y-4">
-          {/* User Balance Summary */}
-          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-xl p-6 text-white shadow-lg border border-yellow-500/20">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-yellow-400 text-xs mb-1 font-medium">Available Balance</p>
-                <p className="text-4xl font-bold text-white">₹{walletBalance.toLocaleString()}</p>
-              </div>
-              <div className="p-3 bg-yellow-500 rounded-xl shadow-lg">
-                <Wallet size={28} className="text-black" />
-              </div>
+
+        {/* LEFT: Withdrawal Form */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          {/* Top Banner */}
+          <div className="bg-gradient-to-r from-slate-900 to-slate-800 px-6 py-5 flex items-center justify-between">
+            <div>
+              <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-1">Available Balance</p>
+              <p className="text-3xl font-black text-white">₹{walletBalance.toLocaleString()}</p>
             </div>
-            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-yellow-500/30">
-              <div>
-                <p className="text-yellow-400 text-xs font-medium">Total Earnings</p>
-                <p className="text-lg font-semibold text-white">₹{totalEarnings.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-yellow-400 text-xs font-medium">Commission</p>
-                <p className="text-lg font-semibold text-white">{commissionPercentage}%</p>
-              </div>
+            <div className="text-right">
+              <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-1">Total Earnings</p>
+              <p className="text-xl font-bold text-white">₹{totalEarnings.toLocaleString()}</p>
+              <p className="text-xs text-yellow-400 font-semibold mt-1">Commission: {commissionPercentage}%</p>
             </div>
           </div>
 
-          {/* Withdrawal Form Card */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          {/* Form Body */}
+          <div className="p-6">
+            <h2 className="text-base font-bold text-gray-900 mb-5 flex items-center gap-2">
               <Banknote size={18} className="text-green-600" />
               Request Withdrawal
             </h2>
             <form onSubmit={handleWithdraw} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Amount (₹)</label>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Amount (₹)</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">₹</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
                   <input
                     type="number"
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
-                    className="w-full pl-8 pr-24 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full pl-8 pr-20 py-3.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-gray-900 font-semibold transition-all"
                     placeholder="0"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setWithdrawAmount(walletBalance.toString())}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-all"
                   >
                     Max
                   </button>
@@ -652,11 +646,11 @@ export default function AgentWallet() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Description (Optional)</label>
                 <textarea
                   value={withdrawDesc}
                   onChange={(e) => setWithdrawDesc(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 resize-none text-sm text-gray-700 transition-all"
                   rows="3"
                   placeholder="Add a note..."
                 />
@@ -665,83 +659,55 @@ export default function AgentWallet() {
               <button
                 type="submit"
                 disabled={withdrawing}
-                className="w-full py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2 font-medium shadow-lg shadow-green-200"
+                className="w-full py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 font-bold shadow-lg shadow-green-200 text-sm"
               >
                 {withdrawing ? (
                   <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
                 ) : (
-                  <>
-                    <FaArrowUp size={16} />
-                    Request Withdrawal
-                  </>
+                  <><FaArrowUp size={14} /> Request Withdrawal</>
                 )}
               </button>
             </form>
           </div>
         </div>
 
-        {/* Withdrawal Info */}
-        <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border border-blue-200 p-6">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="p-3 bg-blue-600 rounded-xl">
-              <FaWallet className="text-white text-xl" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Withdrawal Guidelines</h3>
-              <p className="text-xs text-gray-500 mt-1">Important information for agents</p>
+        {/* RIGHT: Guidelines */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-xl">
+                <FaWallet className="text-white" size={18} />
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-base">Withdrawal Guidelines</h3>
+                <p className="text-blue-100 text-xs mt-0.5">Important information for agents</p>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="bg-white rounded-lg p-4 border border-blue-100">
-              <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-xs font-bold">1</div>
-                Minimum Withdrawal Amount
-              </h4>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                Aap minimum ₹500 withdraw kar sakte ho. Isse kam amount ke liye withdrawal request accept nahi hogi.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-lg p-4 border border-blue-100">
-              <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xs font-bold">2</div>
-                Processing Time
-              </h4>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                Withdrawal request submit karne ke baad 2-3 business days me aapke bank account me amount transfer ho jayega. Weekend aur holidays me thoda delay ho sakta hai.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-lg p-4 border border-blue-100">
-              <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 text-xs font-bold">3</div>
-                Bank Details Verification
-              </h4>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                Pehli baar withdrawal karne se pehle apne bank details verify karwa lein. Profile section me jaake bank details update kar sakte ho.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-lg p-4 border border-blue-100">
-              <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                <div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-xs font-bold">4</div>
-                Transaction Charges
-              </h4>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                Withdrawal pe koi extra charges nahi lagte. Jo amount aap request karoge, wahi amount aapke account me aayega.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-lg p-4 border border-blue-100">
-              <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-xs font-bold">!</div>
-                Important Note
-              </h4>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                Agar withdrawal request 5 days ke baad bhi pending hai toh support team se contact karein. Transaction history me aap apni saari withdrawal requests dekh sakte ho.
-              </p>
-            </div>
+          <div className="p-5 space-y-3">
+            {[
+              { num: '1', color: 'blue',   title: 'Minimum Amount',        text: 'Minimum ₹500 withdraw kar sakte ho. Isse kam amount accept nahi hogi.' },
+              { num: '2', color: 'green',  title: 'Processing Time',        text: '2-3 business days me bank account me transfer ho jayega.' },
+              { num: '3', color: 'purple', title: 'Bank Verification',      text: 'Pehli baar withdrawal se pehle profile me bank details update karein.' },
+              { num: '4', color: 'orange', title: 'No Extra Charges',       text: 'Koi transaction charges nahi. Jo amount request karoge wahi milega.' },
+              { num: '!', color: 'red',    title: 'Important Note',         text: '5 days baad bhi pending ho toh support se contact karein.' },
+            ].map((item) => (
+              <div key={item.num} className="flex items-start gap-3 p-3.5 bg-gray-50 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-black
+                  ${ item.color === 'blue'   ? 'bg-blue-100 text-blue-600'   :
+                     item.color === 'green'  ? 'bg-green-100 text-green-600' :
+                     item.color === 'purple' ? 'bg-purple-100 text-purple-600' :
+                     item.color === 'orange' ? 'bg-orange-100 text-orange-600' :
+                     'bg-red-100 text-red-600' }`}>
+                  {item.num}
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-800 mb-0.5">{item.title}</p>
+                  <p className="text-xs text-gray-500 leading-relaxed">{item.text}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

@@ -15,7 +15,7 @@ const MyBulkBookings = lazy(() => import("../pages/agent/MyBulkBookings"));
 const routes = [
   { path: "/agent/dashboard", component: AgentDashboard, name: "Dashboard", icon: FaTachometerAlt },
   { path: "/agent/bookings", component: AgentBookings, name: "Bookings", icon: FaCar },
-  { path: "/agent/create-bulk-booking", component: CreateBulkBooking, name: "New Bulk Ride", icon: FaPlusCircle },
+  { path: "/agent/create-bulk-booking", component: CreateBulkBooking, name: "New Bulk Ride", icon: FaPlusCircle, hide: true },
   { path: "/agent/my-bulk-bookings", component: MyBulkBookings, name: "Bulk Rides", icon: FaTruck },
   { path: "/agent/create-booking", component: CreateBooking, name: "New Booking", icon: FaPlusCircle, hide: true },
   { path: "/agent/wallet", component: AgentWallet, name: "Wallet", icon: FaWallet },
