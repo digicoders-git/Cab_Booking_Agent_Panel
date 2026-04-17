@@ -7,6 +7,9 @@ import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import routes from ".././route/SidebarRaoute";
 import Sidebar from "../pages/Sidebar";
 import Header from "./Header";
+import { agentService } from "../api/agentApi";
+import { requestForToken, onMessageListener } from "../firebase";
+import { useEffect } from "react";
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -32,6 +35,37 @@ const DashboardLayout = () => {
     logout();
     navigate("/login", { replace: true });
   }, [logout, navigate]);
+
+  // --- FCM TOKEN REGISTRATION ---
+  useEffect(() => {
+    const agentId = admin?._id || admin?.id;
+    if (!agentId) return;
+
+    const setupFCM = async () => {
+      try {
+        const token = await requestForToken();
+        if (token) {
+          await agentService.updateFcmToken(token);
+          console.log("🚀 Agent FCM Token synchronized with backend");
+        }
+      } catch (error) {
+        console.error("Agent FCM Registration failed:", error);
+      }
+    };
+
+    setupFCM();
+
+    // Foreground notification listener
+    const unsubscribe = onMessageListener((payload) => {
+        console.log("🔔 Agent Push Notification received:", payload);
+    });
+
+    return () => {
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [admin?._id]);
 
   return (
     <div

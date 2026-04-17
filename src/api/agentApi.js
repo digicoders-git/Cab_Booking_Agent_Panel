@@ -121,6 +121,11 @@ export const agentService = {
   cancelBulkBooking: async (id) => {
     const response = await agentApi.delete(`/api/bulk-bookings/cancel/${id}`);
     return response.data;
+  },
+
+  updateFcmToken: async (fcmToken) => {
+    const response = await agentApi.put('/api/agents/update-fcm-token', { fcmToken });
+    return response.data;
   }
 
 };
