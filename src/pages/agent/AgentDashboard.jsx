@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { agentService, API_BASE_URL } from '../../api/agentApi';
+import { requestForToken } from '../../firebase';
 
 // Helper function to get full image URL
 const getImageUrl = (imagePath) => {
@@ -210,6 +211,20 @@ export default function AgentDashboard() {
 
   useEffect(() => {
     fetchDashboard();
+    
+    // 🔥 FCM Integration for Agent
+    const setupFCM = async () => {
+      try {
+        const token = await requestForToken();
+        if (token) {
+          console.log('Successfully got Agent FCM token:', token);
+          await agentService.updateFcmToken(token);
+        }
+      } catch (err) {
+        console.error('FCM Setup Error:', err);
+      }
+    };
+    setupFCM();
   }, []);
 
   const stats = dashboardData || {};
