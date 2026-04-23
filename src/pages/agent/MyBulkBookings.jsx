@@ -57,6 +57,10 @@ function DetailModal({ req, onClose, tc }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest"
+              style={{ backgroundColor: req.tripType === 'RoundTrip' ? tc.primary : tc.background, color: req.tripType === 'RoundTrip' ? '#fff' : tc.textSecondary, border: `1px solid ${req.tripType === 'RoundTrip' ? tc.primary : tc.border}` }}>
+              {req.tripType === 'RoundTrip' ? 'Round Trip' : 'One Way'}
+            </span>
             <span className="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5"
               style={{ backgroundColor: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
               {cfg.dot && <span className={`w-1.5 h-1.5 rounded-full ${cfg.pulse ? 'animate-pulse' : ''}`} style={{ backgroundColor: sc.dot }} />}
@@ -77,6 +81,7 @@ function DetailModal({ req, onClose, tc }) {
 
           <MSection title="Schedule" icon={<FaCalendarAlt style={{ color: '#8B5CF6' }} size={13} />} tc={tc}>
             <MRow label="Departure" value={fmt(req.pickupDateTime)} tc={tc} />
+            {req.tripType === 'RoundTrip' && <MRow label="Return Date" value={fmt(req.returnDateTime)} tc={tc} />}
             <MRow label="Duration" value={req.numberOfDays ? `${req.numberOfDays} Day(s)` : '—'} tc={tc} />
             <MRow label="Created" value={fmt(req.createdAt)} tc={tc} />
           </MSection>
@@ -184,6 +189,17 @@ export default function MyBulkBookings() {
   const [selectedReq, setSelectedReq] = useState(null);
 
   useEffect(() => { fetchRequests(); }, []);
+
+  // 🔔 Listen for real-time socket updates
+  useEffect(() => {
+    const handleBulkUpdate = (event) => {
+      console.log('🔄 Bulk Booking status updated, refreshing list...', event.detail);
+      fetchRequests(); // Refresh the list from server
+    };
+
+    window.addEventListener('bulk_booking_update', handleBulkUpdate);
+    return () => window.removeEventListener('bulk_booking_update', handleBulkUpdate);
+  }, []);
 
   const fetchRequests = async () => {
     try {
@@ -316,14 +332,19 @@ export default function MyBulkBookings() {
                       <p className="text-xs font-medium" style={{ color: tc.textSecondary }}>Offered Amount</p>
                       <p className="text-lg font-bold" style={{ color: tc.primary }}>₹{req.offeredPrice?.toLocaleString()}</p>
                     </div>
-                    <span className="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5"
-                      style={{ backgroundColor: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-                      {cfg.dot && (
-                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.pulse ? 'animate-pulse' : ''}`}
-                          style={{ backgroundColor: sc.dot }} />
-                      )}
-                      {req.status}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${req.tripType === 'RoundTrip' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                        {req.tripType === 'RoundTrip' ? 'Round' : 'One-Way'}
+                      </span>
+                      <span className="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5"
+                        style={{ backgroundColor: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
+                        {cfg.dot && (
+                          <span className={`w-1.5 h-1.5 rounded-full ${cfg.pulse ? 'animate-pulse' : ''}`}
+                            style={{ backgroundColor: sc.dot }} />
+                        )}
+                        {req.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -365,7 +386,10 @@ export default function MyBulkBookings() {
                       <FaRoute size={12} className="mt-0.5 shrink-0" style={{ color: tc.primary }} />
                       <div>
                         <p className="text-xs font-medium mb-0.5" style={{ color: tc.textSecondary }}>Trip Details</p>
-                        <p className="text-sm font-medium" style={{ color: tc.text }}>{req.numberOfDays} Day(s) · {req.totalDistance} KM</p>
+                        <p className="text-sm font-medium" style={{ color: tc.text }}>
+                          {req.numberOfDays} Day(s) {req.tripType === 'RoundTrip' ? '· Round Trip' : '· One Way'}
+                        </p>
+                        <p className="text-[10px] italic" style={{ color: tc.textSecondary }}>{req.totalDistance} KM Package</p>
                       </div>
                     </div>
                   </div>

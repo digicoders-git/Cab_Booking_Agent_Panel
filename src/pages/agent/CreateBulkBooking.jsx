@@ -15,10 +15,9 @@ export default function CreateBulkBooking() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedCars, setSelectedCars] = useState([]);
   const [formData, setFormData] = useState({
-    pickup: "", drop: "",
-    pickupCoords: { lat: 0, lng: 0 },
-    dropCoords: { lat: 0, lng: 0 },
     date: "", time: "10:00",
+    tripType: "OneWay",
+    returnDate: "",
     days: 1, distance: 0,
     notes: "", priceModifier: 0
   });
@@ -31,6 +30,17 @@ export default function CreateBulkBooking() {
     const timer = setTimeout(initAutocomplete, 1000);
     return () => clearTimeout(timer);
   }, []);
+
+  // 🕒 Auto-calculate days for RoundTrip
+  useEffect(() => {
+    if (formData.tripType === 'RoundTrip' && formData.date && formData.returnDate) {
+        const start = new Date(formData.date);
+        const end = new Date(formData.returnDate);
+        const diffTime = Math.abs(end - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both days
+        setFormData(prev => ({ ...prev, days: diffDays }));
+    }
+  }, [formData.date, formData.returnDate, formData.tripType]);
 
   const initAutocomplete = () => {
     if (!window.google || !pickupRef.current || !dropRef.current) return;
@@ -107,7 +117,8 @@ export default function CreateBulkBooking() {
   };
 
   const calculateTotal = () => {
-    const base = selectedCars.reduce((acc, car) => acc + car.price * car.quantity * formData.days * (formData.distance || 0), 0);
+    const distanceMultiplier = formData.tripType === 'RoundTrip' ? 2 : 1;
+    const base = selectedCars.reduce((acc, car) => acc + car.price * car.quantity * formData.days * ((formData.distance || 0) * distanceMultiplier), 0);
     return Math.round(base + base * (formData.priceModifier / 100));
   };
 
@@ -133,6 +144,8 @@ export default function CreateBulkBooking() {
         pickup: { address: formData.pickup, latitude: formData.pickupCoords.lat, longitude: formData.pickupCoords.lng },
         drop: { address: formData.drop, latitude: formData.dropCoords.lat, longitude: formData.dropCoords.lng },
         pickupDateTime: `${formData.date}T${formData.time}`,
+        tripType: formData.tripType,
+        returnDateTime: formData.tripType === 'RoundTrip' ? `${formData.returnDate}T${formData.time}` : null,
         numberOfDays: formData.days,
         totalDistance: formData.distance,
         carsRequired: selectedCars.map(c => ({ category: c.id, quantity: c.quantity })),
@@ -275,56 +288,66 @@ export default function CreateBulkBooking() {
                 />
               </div>
 
+              <div className="sm:col-span-2 space-y-2 mb-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trip Type</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, tripType: "OneWay", days: 1 })}
+                    className={`py-3 rounded-xl font-bold text-sm transition-all border-2 ${formData.tripType === 'OneWay' ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100' : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200'}`}
+                  >
+                    One Way Ride
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, tripType: "RoundTrip" })}
+                    className={`py-3 rounded-xl font-bold text-sm transition-all border-2 ${formData.tripType === 'RoundTrip' ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100' : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200'}`}
+                  >
+                    Round Trip (Return)
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Reporting Date *</label>
                 <input
                   type="date"
                   value={formData.date}
                   min={new Date().toISOString().split('T')[0]}
-                  onChange={e => setFormData({ ...formData, date: e.target.value })}
+                  onChange={e => {
+                      const selected = e.target.value;
+                      setFormData({ 
+                        ...formData, 
+                        date: selected,
+                        returnDate: formData.returnDate < selected ? selected : formData.returnDate
+                      });
+                  }}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Reporting Time</label>
-                <div className="flex gap-2">
-                  <input
-                    type="time"
-                    value={formData.time}
-                    onChange={e => setFormData({ ...formData, time: e.target.value })}
-                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                  {formData.time && (
-                    <div className="flex items-center px-3 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-600 whitespace-nowrap">
-                      {(() => {
-                        const [h, m] = formData.time.split(':').map(Number);
-                        const ampm = h >= 12 ? 'PM' : 'AM';
-                        const hour = h % 12 || 12;
-                        return `${hour}:${String(m).padStart(2,'0')} ${ampm}`;
-                      })()}
+                {formData.tripType === 'RoundTrip' ? (
+                  <>
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5 text-pink-600 font-bold">Return Date *</label>
+                    <input
+                      type="date"
+                      value={formData.returnDate}
+                      min={formData.date || new Date().toISOString().split('T')[0]}
+                      onChange={e => setFormData({ ...formData, returnDate: e.target.value })}
+                      className="w-full bg-pink-50 border border-pink-200 rounded-xl py-2.5 px-3.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all font-bold"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Trip Duration (Days)</label>
+                    <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2">
+                      <button onClick={() => setFormData({ ...formData, days: Math.max(1, formData.days - 1) })} className="w-7 h-7 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-all"><FaMinus size={10} /></button>
+                      <span className="flex-1 text-center text-sm font-semibold text-gray-800">{formData.days} Day(s)</span>
+                      <button onClick={() => setFormData({ ...formData, days: formData.days + 1 })} className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition-all"><FaPlus size={10} /></button>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Trip Duration</label>
-                <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2">
-                  <button
-                    onClick={() => setFormData({ ...formData, days: Math.max(1, formData.days - 1) })}
-                    className="w-7 h-7 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-all"
-                  >
-                    <FaMinus size={10} />
-                  </button>
-                  <span className="flex-1 text-center text-sm font-semibold text-gray-800">{formData.days} {formData.days === 1 ? 'Day' : 'Days'}</span>
-                  <button
-                    onClick={() => setFormData({ ...formData, days: formData.days + 1 })}
-                    className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition-all"
-                  >
-                    <FaPlus size={10} />
-                  </button>
-                </div>
+                  </>
+                )}
               </div>
 
               <div>

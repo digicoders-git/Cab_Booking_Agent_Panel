@@ -83,20 +83,9 @@ export default function AgentBookings() {
             ? booking.assignedDriver?._id 
             : booking.assignedDriver;
 
-          console.log('🔍 Checking booking:', {
-            bookingId: booking._id?.slice(-8),
-            driverId,
-            incomingDriverId: data.driverId,
-            status: booking.bookingStatus,
-            match: driverId === data.driverId
-          });
-
           if (driverId === data.driverId && 
               booking.bookingStatus && 
               ['accepted', 'ongoing'].includes(booking.bookingStatus.toLowerCase())) {
-            
-            console.log('✅ MATCH! Updating booking:', booking._id?.slice(-8));
-            console.log('📍 New Location:', { lat: data.latitude, lng: data.longitude });
             
             return {
               ...booking,
@@ -110,19 +99,69 @@ export default function AgentBookings() {
           }
           return booking;
         });
-        
-        console.log('📦 Updated Bookings State:', updated);
         return updated;
+      });
+    };
+
+    const handleDriverArrived = (event) => {
+      const data = event.detail;
+      console.log('📍 AgentBookings: Driver Arrived Event Received:', data);
+      
+      setBookings(prevBookings => {
+        return prevBookings.map(booking => {
+          if (booking._id === data.bookingId) {
+            return {
+              ...booking,
+              tripData: {
+                ...booking.tripData,
+                arrivedAt: data.arrivedAt || new Date().toISOString()
+              }
+            };
+          }
+          return booking;
+        });
+      });
+    };
+
+    const handleStopUpdate = (event) => {
+      const data = event.detail;
+      console.log('📍 AgentBookings: Stop Update Received:', data);
+      
+      setBookings(prevBookings => {
+        return prevBookings.map(booking => {
+          if (booking._id === data.bookingId) {
+             const updatedStops = [...(booking.stops || [])];
+             if (updatedStops[data.stopIndex]) {
+                updatedStops[data.stopIndex] = {
+                   ...updatedStops[data.stopIndex],
+                   status: data.status,
+                   arrivedAt: data.arrivedAt,
+                   waitingTimeMin: data.waitingTimeMin,
+                   waitingCharges: data.waitingCharges
+                };
+             }
+             return {
+                ...booking,
+                stops: updatedStops,
+                actualFare: data.actualFare || booking.actualFare
+             };
+          }
+          return booking;
+        });
       });
     };
 
     // Listen for custom events
     window.addEventListener('booking_update', handleBookingUpdate);
     window.addEventListener('driver_location_update', handleLocationUpdate);
+    window.addEventListener('driver_arrived', handleDriverArrived);
+    window.addEventListener('stop_update', handleStopUpdate);
 
     return () => {
       window.removeEventListener('booking_update', handleBookingUpdate);
       window.removeEventListener('driver_location_update', handleLocationUpdate);
+      window.removeEventListener('driver_arrived', handleDriverArrived);
+      window.removeEventListener('stop_update', handleStopUpdate);
     };
   }, []);
 

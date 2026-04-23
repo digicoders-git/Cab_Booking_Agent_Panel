@@ -1,7 +1,11 @@
 // src/components/BookingTable.jsx
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { FaChevronDown, FaChevronUp, FaSearch, FaTimes, FaSync, FaBan, FaMapMarkedAlt } from 'react-icons/fa';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Phone, MapPin } from 'lucide-react';
+import { 
+    ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, 
+    Phone, MapPin, Clock, User, Calendar, 
+    CheckCircle2, AlertCircle, Loader2, X 
+} from 'lucide-react';
 import { agentService, API_BASE_URL } from '../api/agentApi';
 import { toast } from 'sonner';
 
@@ -330,6 +334,61 @@ const LiveMapModalContent = ({ booking, mapType }) => {
   );
 };
 
+// --- WAITING TIMER COMPONENT ---
+const WaitingTimer = ({ arrivedAt, freeWaitingMin, waitingChargePerMin }) => {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!arrivedAt) return;
+    
+    // Calculate initial elapsed time
+    const start = new Date(arrivedAt).getTime();
+    const update = () => {
+      const now = Date.now();
+      setElapsed(Math.floor((now - start) / 1000));
+    };
+    
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [arrivedAt]);
+
+  if (!arrivedAt) return null;
+
+  const freeSecs = (freeWaitingMin || 5) * 60;
+  const isExtra = elapsed > freeSecs;
+  const displaySecs = isExtra ? elapsed - freeSecs : freeSecs - elapsed;
+  
+  // Calculate live charges
+  const extraMins = isExtra ? Math.ceil((elapsed - freeSecs) / 60) : 0;
+  const liveCharges = extraMins * (waitingChargePerMin || 2);
+  
+  const formatTime = (s) => {
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className={`mt-1 flex flex-col items-center gap-1 px-2 py-1 rounded text-[10px] font-bold border ${
+      isExtra ? 'bg-red-50 text-red-700 border-red-200 shadow-sm' : 'bg-green-50 text-green-600 border-green-200'
+    }`}>
+      <div className="flex items-center gap-1.5">
+        <span className="relative flex h-2 w-2">
+          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isExtra ? 'bg-red-400' : 'bg-green-400'}`}></span>
+          <span className={`relative inline-flex rounded-full h-2 w-2 ${isExtra ? 'bg-red-500' : 'bg-green-500'}`}></span>
+        </span>
+        {isExtra ? `EXTRA: ${formatTime(displaySecs)}` : `FREE: ${formatTime(displaySecs)}`}
+      </div>
+      {isExtra && (
+        <div className="bg-red-600 text-white px-2 py-0.5 rounded-full mt-0.5 text-[9px] animate-bounce">
+          CHARGES: ₹{liveCharges}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const StatusBadge = ({ status, booking }) => {
   const cfg = {
     completed: 'bg-green-100 text-green-700',
@@ -371,13 +430,22 @@ const StatusBadge = ({ status, booking }) => {
   };
 
   return (
-    <span 
-      className={`px-2 py-1 ${cfg} rounded-full text-xs font-medium`}
-      onClick={handleStatusClick}
-      title={status?.toLowerCase() === 'accepted' ? 'Click to view route on Google Maps' : ''}
-    >
-      {status || '—'}
-    </span>
+    <div className="flex flex-col items-center">
+      <span 
+        className={`px-2 py-1 ${cfg} rounded-full text-xs font-medium`}
+        onClick={handleStatusClick}
+        title={status?.toLowerCase() === 'accepted' ? 'Click to view route on Google Maps' : ''}
+      >
+        {status || '—'}
+      </span>
+      {status?.toLowerCase() === 'accepted' && booking.tripData?.arrivedAt && (
+        <WaitingTimer 
+          arrivedAt={booking.tripData.arrivedAt} 
+          freeWaitingMin={booking.carCategory?.freeWaitingMin || 5} 
+          waitingChargePerMin={booking.carCategory?.waitingChargePerMin || 2}
+        />
+      )}
+    </div>
   );
 };
 
@@ -484,7 +552,7 @@ const BookingRow = ({ booking, onRefresh }) => {
           <p className="text-sm text-gray-700">{booking.estimatedDistanceKm ? `${booking.estimatedDistanceKm} km` : '—'}</p>
         </td>
         <td className="px-4 py-3">
-          <p className="text-sm font-bold text-green-600">₹{booking.fareEstimate?.toLocaleString() || '—'}</p>
+          <p className="text-sm font-bold text-green-600">₹{(booking.actualFare || booking.fareEstimate || 0).toLocaleString()}</p>
           <p className="text-xs text-gray-400">{booking.paymentMethod || '—'}</p>
         </td>
         <td className="px-4 py-3">
@@ -571,8 +639,8 @@ const BookingRow = ({ booking, onRefresh }) => {
                 <p className="font-semibold text-gray-800">{booking.pickupTime || '—'}</p>
               </div>
               <div className="bg-white rounded-lg p-2.5 border border-gray-100">
-                <p className="text-gray-400 uppercase mb-1">Actual Fare</p>
-                <p className="font-semibold text-gray-800">₹{booking.actualFare?.toLocaleString() || 0}</p>
+                <p className="text-gray-400 uppercase mb-1">Total Bill</p>
+                <p className="font-bold text-blue-600">₹{(booking.actualFare || booking.fareEstimate || 0).toLocaleString()}</p>
               </div>
               <div className="bg-white rounded-lg p-2.5 border border-gray-100">
                 <p className="text-gray-400 uppercase mb-1">Assigned Driver</p>
@@ -589,9 +657,11 @@ const BookingRow = ({ booking, onRefresh }) => {
               <div className="bg-white rounded-lg p-2.5 border border-gray-100">
                 <p className="text-gray-400 uppercase mb-1">Assigned Car</p>
                 <p className="font-semibold text-gray-800">
-                  {typeof booking.assignedCar === 'object'
+                  {typeof booking.assignedCar === 'object' && booking.assignedCar !== null
                     ? booking.assignedCar?.carDetails || booking.assignedCar?.name || 'Not Assigned'
-                    : booking.assignedCar || 'Not Assigned'
+                    : (typeof booking.assignedDriver === 'object' && booking.assignedDriver?.carDetails
+                        ? `${booking.assignedDriver.carDetails.carBrand || ''} ${booking.assignedDriver.carDetails.carModel || ''} (${booking.assignedDriver.carDetails.carNumber || 'N/A'})`
+                        : 'Not Assigned')
                   }
                 </p>
               </div>
@@ -625,6 +695,93 @@ const BookingRow = ({ booking, onRefresh }) => {
                 <div className="bg-white rounded-lg p-2.5 border border-red-100 col-span-2">
                   <p className="text-gray-400 uppercase mb-1">Cancel Reason</p>
                   <p className="text-red-600 font-medium">{booking.cancelReason}</p>
+                </div>
+              )}
+
+              {/* INTERMEDIATE STOPS SECTION */}
+              {booking.stops && booking.stops.length > 0 && (
+                <div className="col-span-2 sm:col-span-4 bg-orange-50/30 rounded-xl p-4 border border-orange-100">
+                  <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <MapPin size={12} /> Intermediate Waypoints ({booking.stops.length})
+                  </p>
+                  <div className="space-y-3">
+                    {booking.stops.map((stop, sIdx) => {
+                      const isArrived = stop.status === 'Arrived';
+                      const isCompleted = stop.status === 'Completed';
+                      
+                      return (
+                        <div key={sIdx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-lg border border-orange-100 shadow-sm transition-all hover:shadow-md">
+                          <div className="flex items-start gap-3">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
+                              isCompleted ? 'bg-green-600 text-white' : 'bg-orange-500 text-white animate-pulse'
+                            }`}>
+                              {sIdx + 1}
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-gray-800 leading-tight">{stop.address}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                                  isCompleted ? 'bg-green-100 text-green-700' : 
+                                  isArrived ? 'bg-orange-100 text-orange-700 animate-pulse' : 
+                                  'bg-gray-100 text-gray-500'
+                                }`}>
+                                  {stop.status || 'Pending'}
+                                </span>
+                                {stop.waitingCharges > 0 && (
+                                  <span className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-600 rounded-full border border-red-100 shadow-sm animate-pulse">
+                                    <Clock size={10} className="shrink-0" />
+                                    <span className="text-[9px] font-black uppercase tracking-tight">
+                                      Wait: ₹{stop.waitingCharges.toLocaleString()}
+                                    </span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {isArrived && stop.arrivedAt && (
+                            <div className="sm:border-l sm:pl-4">
+                               <WaitingTimer 
+                                arrivedAt={stop.arrivedAt} 
+                                freeWaitingMin={booking.carCategory?.freeWaitingMin || 5} 
+                                waitingChargePerMin={booking.carCategory?.waitingChargePerMin || 2}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {booking.tripData?.arrivedAt && booking.bookingStatus?.toLowerCase() === 'accepted' && (
+                <div className={`col-span-2 sm:col-span-4 rounded-xl p-4 border-2 flex flex-col sm:flex-row items-center justify-between gap-4 ${
+                  (Date.now() - new Date(booking.tripData.arrivedAt).getTime()) > ((booking.carCategory?.freeWaitingMin || 5) * 60000)
+                  ? 'bg-red-50 border-red-200' 
+                  : 'bg-green-50 border-green-200 shadow-sm shadow-green-100'
+                }`}>
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className={`p-2 rounded-lg ${
+                       (Date.now() - new Date(booking.tripData.arrivedAt).getTime()) > ((booking.carCategory?.freeWaitingMin || 5) * 60000)
+                       ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                    }`}>
+                      <Clock size={20} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider">⏱️ Pickup Waiting Area</p>
+                      <p className="text-xs font-bold text-gray-800 mt-0.5">
+                        Arrived: <span className="font-black">{new Date(booking.tripData.arrivedAt).toLocaleTimeString()}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-full sm:w-auto">
+                    <WaitingTimer 
+                      arrivedAt={booking.tripData.arrivedAt} 
+                      freeWaitingMin={booking.carCategory?.freeWaitingMin || 5} 
+                      waitingChargePerMin={booking.carCategory?.waitingChargePerMin || 2}
+                    />
+                  </div>
                 </div>
               )}
             </div>

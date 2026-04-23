@@ -7,7 +7,7 @@ import Swal from 'sweetalert2';
 import {
     FaArrowLeft, FaUser, FaPhone, FaCar, FaSearch,
     FaSpinner, FaCheckCircle, FaExclamationTriangle, FaUsers,
-    FaArrowRight
+    FaArrowRight, FaPlusCircle
 } from 'react-icons/fa';
 import { MapPin, User, Phone, Calendar, Clock, Navigation, X } from 'lucide-react';
 import GOOGLE_MAPS_API from '../../utils/locationUtils';
@@ -40,6 +40,9 @@ export default function CreateBooking() {
     const [mapCenter, setMapCenter] = useState({ lat: 26.8467, lng: 80.9462 }); // Default: Lucknow
     const [pickupMarker, setPickupMarker] = useState(null);
     const [dropMarker, setDropMarker] = useState(null);
+
+    // Intermediate Stops
+    const [stops, setStops] = useState([]); // [{ address, lat, lng, suggestions: [], showSuggestions: false }]
 
     // Step 3: Ride Type
     const [rideType, setRideType] = useState('');
@@ -240,19 +243,50 @@ export default function CreateBooking() {
 
         setCalculating(true);
         try {
-            toast.loading('Locations dhundh raha hai...', { id: 'loc' });
-            const [pickupResult, dropResult] = await Promise.all([
-                GOOGLE_MAPS_API.geocode(pickupAddress),
-                GOOGLE_MAPS_API.geocode(dropAddress)
-            ]);
-
+            toast.loading(`${stops.length > 0 ? 'Multi-stop route' : 'Route'} calculate ho raha hai...`, { id: 'loc' });
+            
+            // 1. Geocode Pickup
+            const pickupResult = await GOOGLE_MAPS_API.geocode(pickupAddress);
             if (!pickupResult.success) throw new Error(`Pickup: ${pickupResult.error}`);
+            
+            // 2. Geocode all stops
+            const stopsWithCoords = [];
+            for (let i = 0; i < stops.length; i++) {
+                if (!stops[i].address.trim()) throw new Error(`Stop ${i + 1} address khali hai`);
+                const stopRes = await GOOGLE_MAPS_API.geocode(stops[i].address);
+                if (!stopRes.success) throw new Error(`Stop ${i + 1}: ${stopRes.error}`);
+                stopsWithCoords.push({ 
+                    address: stopRes.displayName, 
+                    latitude: stopRes.lat, 
+                    longitude: stopRes.lng 
+                });
+            }
+
+            // 3. Geocode Drop
+            const dropResult = await GOOGLE_MAPS_API.geocode(dropAddress);
             if (!dropResult.success) throw new Error(`Drop: ${dropResult.error}`);
 
-            const dist = await GOOGLE_MAPS_API.getDistance(
-                pickupResult.lat, pickupResult.lng,
-                dropResult.lat, dropResult.lng
-            );
+            // 4. Calculate total distance segment by segment
+            let totalDist = 0;
+            let currentPoint = { lat: pickupResult.lat, lng: pickupResult.lng };
+            
+            // Segments: Pickup -> Stop1 -> Stop2 -> ... -> Drop
+            const waypoints = [...stopsWithCoords, { lat: dropResult.lat, lng: dropResult.lng, address: dropResult.displayName }];
+            
+            for (const point of waypoints) {
+                const targetLat = point.lat || point.latitude;
+                const targetLng = point.lng || point.longitude;
+
+                const segmentDist = await GOOGLE_MAPS_API.getDistance(
+                    currentPoint.lat || currentPoint.latitude,
+                    currentPoint.lng || currentPoint.longitude,
+                    targetLat, targetLng
+                );
+                totalDist += segmentDist;
+                currentPoint = { lat: targetLat, lng: targetLng };
+            }
+
+            totalDist = parseFloat(totalDist.toFixed(2));
 
             // Set markers for map
             setPickupMarker({ lat: pickupResult.lat, lng: pickupResult.lng });
@@ -261,14 +295,15 @@ export default function CreateBooking() {
             setShowMap(true);
 
             setDistance({
-                value: dist,
+                value: totalDist,
                 pickup: { lat: pickupResult.lat, lng: pickupResult.lng },
                 drop: { lat: dropResult.lat, lng: dropResult.lng },
                 pickupName: pickupResult.displayName,
-                dropName: dropResult.displayName
+                dropName: dropResult.displayName,
+                stops: stopsWithCoords
             });
 
-            toast.success(`Distance: ${dist} km`, { id: 'loc' });
+            toast.success(`Total Distance: ${totalDist} km`, { id: 'loc' });
             setCurrentStep(3); // Auto move to ride type selection
         } catch (err) {
             toast.error(err.message || 'Distance calculate nahi hua', { id: 'loc' });
@@ -356,7 +391,8 @@ export default function CreateBooking() {
                 dropAddress,
                 dropLat: distance.drop.lat,
                 dropLng: distance.drop.lng,
-                distanceKm: distance.value
+                distanceKm: distance.value,
+                stops: distance.stops || []
             });
 
             if (response.success) {
@@ -592,6 +628,98 @@ export default function CreateBooking() {
                             )}
                         </div>
 
+                        {/* --- INTERMEDIATE STOPS --- */}
+                        <div className="space-y-4">
+                            {stops.map((stop, index) => (
+                                <div key={index} className="relative bg-orange-50/30 p-4 rounded-xl border border-dashed border-orange-200">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-xs font-black text-orange-600 uppercase tracking-widest">
+                                            Stop {index + 1}
+                                        </label>
+                                        <button 
+                                            onClick={() => {
+                                                const newStops = [...stops];
+                                                newStops.splice(index, 1);
+                                                setStops(newStops);
+                                            }}
+                                            className="text-red-500 hover:text-red-700"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="relative">
+                                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" size={16} />
+                                        <input
+                                            type="text"
+                                            value={stop.address}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                const newStops = [...stops];
+                                                newStops[index].address = val;
+                                                newStops[index].showSuggestions = true;
+                                                setStops(newStops);
+
+                                                // Suggestions for this specific stop
+                                                if (val.length >= 2) {
+                                                    GOOGLE_MAPS_API.getSuggestions(val).then(res => {
+                                                        const latestStops = [...stops];
+                                                        latestStops[index].suggestions = res;
+                                                        setStops(latestStops);
+                                                    });
+                                                }
+                                            }}
+                                            onFocus={() => {
+                                                const newStops = [...stops];
+                                                newStops[index].showSuggestions = true;
+                                                setStops(newStops);
+                                            }}
+                                            onBlur={() => {
+                                                setTimeout(() => {
+                                                    const newStops = [...stops];
+                                                    if (newStops[index]) {
+                                                        newStops[index].showSuggestions = false;
+                                                        setStops(newStops);
+                                                    }
+                                                }, 200);
+                                            }}
+                                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm"
+                                            placeholder={`Stop ${index + 1} ka address...`}
+                                        />
+                                        
+                                        {stop.showSuggestions && stop.suggestions?.length > 0 && (
+                                            <div 
+                                                className="absolute z-30 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto"
+                                                onMouseDown={(e) => e.preventDefault()}
+                                            >
+                                                {stop.suggestions.map((place, pIdx) => (
+                                                    <div 
+                                                        key={pIdx}
+                                                        className="px-3 py-2 hover:bg-orange-50 cursor-pointer text-xs"
+                                                        onClick={() => {
+                                                            const finalStops = [...stops];
+                                                            finalStops[index].address = place.description;
+                                                            finalStops[index].suggestions = [];
+                                                            finalStops[index].showSuggestions = false;
+                                                            setStops(finalStops);
+                                                        }}
+                                                    >
+                                                        {place.description}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+
+                            <button 
+                                onClick={() => setStops([...stops, { address: '', suggestions: [], showSuggestions: false }])}
+                                className="w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+                            >
+                                <FaPlusCircle size={14} /> Add Stop
+                            </button>
+                        </div>
+
                         {/* Drop */}
                         <div className="relative">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Drop Location</label>
@@ -729,6 +857,7 @@ export default function CreateBooking() {
                                 <GoogleMapView
                                     pickupMarker={distance.pickup}
                                     dropMarker={distance.drop}
+                                    stops={distance.stops || []}
                                     mapCenter={distance.pickup}
                                     onClose={() => { }}
                                 />

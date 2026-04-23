@@ -13,7 +13,8 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     // Only connect if user is logged in
-    if (!isLoggedIn || !admin?._id || !token) {
+    const agentId = admin?._id || admin?.id || admin?.agentId;
+    if (!isLoggedIn || !agentId || !token) {
       if (socket) {
         console.log('🔌 Disconnecting socket...');
         socket.disconnect();
@@ -132,6 +133,51 @@ export const SocketProvider = ({ children }) => {
       window.dispatchEvent(new CustomEvent('new_notification', { detail: data }));
     });
 
+    // 🚕 Driver Arrived Update
+    newSocket.on('driver_arrived', (data) => {
+      console.log('📢 Driver Arrived at Pickup:', data);
+      
+      toast.success(
+        `🚕 Driver has arrived for ${data.passengerName || 'your booking'}!`,
+        { duration: 5000, icon: '📍' }
+      );
+
+      // Dispatch custom event for components
+      window.dispatchEvent(new CustomEvent('driver_arrived', { detail: data }));
+    });
+
+    // 📍 Intermediate Stop Updates (New)
+    newSocket.on('stop_update', (data) => {
+      console.log('📢 Intermediate Stop Update:', data);
+      
+      const statusIcon = data.status === 'Arrived' ? '⏳' : '✅';
+      const statusMsg = data.status === 'Arrived' 
+        ? `Driver arrived at stop index ${data.stopIndex + 1}`
+        : `Driver completed stop index ${data.stopIndex + 1}`;
+
+      toast.info(statusMsg, { duration: 5000, icon: statusIcon });
+
+      // Dispatch custom event for BookingTable
+      window.dispatchEvent(new CustomEvent('stop_update', { detail: data }));
+    });
+
+    // 📦 Bulk Booking Specific Updates
+    newSocket.on('bulk_booking_update', (data) => {
+      console.log('📢 Bulk Booking Update Received:', data);
+      
+      if (data.status === 'Accepted') {
+        toast.success(
+          `🎉 Bulk Booking Accepted! ${data.fleetName || 'A Fleet Owner'} has taken the deal.`,
+          { duration: 6000 }
+        );
+      } else if (data.status === 'Ongoing') {
+        toast.info(`🚚 Bulk trip for ${data.bookingId?.slice(-8)} is now ongoing.`);
+      }
+
+      // Dispatch custom event for MyBulkBookings page
+      window.dispatchEvent(new CustomEvent('bulk_booking_update', { detail: data }));
+    });
+
     setSocket(newSocket);
 
     // Cleanup on unmount
@@ -139,7 +185,7 @@ export const SocketProvider = ({ children }) => {
       console.log('🔌 Cleaning up socket connection...');
       newSocket.disconnect();
     };
-  }, [isLoggedIn, admin?._id, token]);
+  }, [isLoggedIn, admin?._id, admin?.id, token]);
 
   return (
     <SocketContext.Provider value={{ socket, connected }}>
