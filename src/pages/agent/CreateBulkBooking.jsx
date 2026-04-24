@@ -8,6 +8,17 @@ import {
 import { toast } from "sonner";
 import Swal from "sweetalert2";
 
+// --- Helper: Load Razorpay Script ---
+const loadRazorpay = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 export default function CreateBulkBooking() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
@@ -154,11 +165,51 @@ export default function CreateBulkBooking() {
       });
 
       if (res.success) {
-        toast.success("Bulk booking request submitted!");
-        navigate("/agent/my-bulk-bookings");
+        const { bookingId, advanceAmount } = res;
+        
+        // 💳 START RAZORPAY PAYMENT
+        const resScript = await loadRazorpay();
+        if (!resScript) {
+          toast.error("Razorpay SDK failed to load");
+          setSubmitting(false);
+          return;
+        }
+
+        const options = {
+          key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+          amount: advanceAmount * 100, // in paise
+          currency: "INR",
+          name: "Agent Bulk Advance",
+          description: "25% Advance for Bulk Booking",
+          handler: async (response) => {
+            try {
+              setSubmitting(true);
+              const verifyRes = await agentService.verifyBulkPayment({
+                bookingId,
+                paymentId: response.razorpay_payment_id,
+                type: 'advance'
+              });
+              if (verifyRes.success) {
+                toast.success("Advance Paid! Request Live on Marketplace.");
+                navigate("/agent/my-bulk-bookings");
+              }
+            } catch (err) {
+              toast.error("Payment verification failed.");
+            } finally {
+              setSubmitting(false);
+            }
+          },
+          prefill: {
+            name: "Agent",
+          },
+          theme: { color: "#2563EB" },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
       }
-    } catch {
-      toast.error("Submission failed. Please try again.");
+    } catch (err) {
+      toast.error(err.message || "Submission failed. Please try again.");
     } finally {
       setSubmitting(false);
     }

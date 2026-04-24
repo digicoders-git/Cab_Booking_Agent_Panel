@@ -126,6 +126,11 @@ export const agentService = {
   updateFcmToken: async (fcmToken) => {
     const response = await agentApi.put('/api/agents/update-fcm-token', { fcmToken });
     return response.data;
+  },
+
+  verifyBulkPayment: async (data) => {
+    const response = await agentApi.post('/api/bulk-bookings/verify-payment', data);
+    return response.data;
   }
 
 };
