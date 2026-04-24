@@ -271,13 +271,61 @@ const LiveMapModalContent = ({ booking, mapType }) => {
             ? 2 * progress * progress
             : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
+          const currentLat = startLat + (lat - startLat) * eased;
+          const currentLng = startLng + (lng - startLng) * eased;
+          const currentPos = new window.google.maps.LatLng(currentLat, currentLng);
+
           if (driverMarkerRef.current) {
-            driverMarkerRef.current.setPosition(
-              new window.google.maps.LatLng(
-                startLat + (lat - startLat) * eased,
-                startLng + (lng - startLng) * eased
-              )
-            );
+            driverMarkerRef.current.setPosition(currentPos);
+            
+            // --- 🔄 PROFESSIONAL ROTATION LOGIC (Canvas Magic) ---
+            let iconUrl = `${API_BASE_URL}/uploads/${booking.carCategory?.image}`;
+            
+            // If image is missing, fallback to the SVG-based icon
+            if (!booking.carCategory?.image) {
+              const svgIcon = getCarIcon(heading);
+              driverMarkerRef.current.setIcon({
+                url: svgIcon,
+                scaledSize: new window.google.maps.Size(60, 60),
+                anchor: new window.google.maps.Point(30, 30)
+              });
+            } else {
+              // Create Canvas to rotate the actual category image
+              const img = new Image();
+              img.crossOrigin = "anonymous";
+              img.src = iconUrl;
+              
+              img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const size = 64;
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                
+                ctx.translate(size/2, size/2);
+                ctx.rotate(heading * Math.PI / 180);
+                ctx.drawImage(img, -size/2, -size/2, size, size);
+                
+                if (driverMarkerRef.current) {
+                  driverMarkerRef.current.setIcon({
+                    url: canvas.toDataURL(),
+                    scaledSize: new window.google.maps.Size(60, 60),
+                    anchor: new window.google.maps.Point(30, 30)
+                  });
+                }
+              };
+
+              img.onerror = () => {
+                // Final fallback if image fails to load
+                if (driverMarkerRef.current) {
+                  driverMarkerRef.current.setIcon({
+                    url: getCarIcon(heading),
+                    scaledSize: new window.google.maps.Size(60, 60),
+                    anchor: new window.google.maps.Point(30, 30)
+                  });
+                }
+              };
+            }
           }
           animationRef.current = requestAnimationFrame(animate);
         } else {
@@ -324,10 +372,37 @@ const LiveMapModalContent = ({ booking, mapType }) => {
   return (
     <div className="relative">
       <div ref={mapRef} className="w-full h-[400px] md:h-[500px] rounded-xl border-2 border-gray-200 overflow-hidden shadow-inner" />
+      
+      {/* 🟢 NEW: Live Driver Data Box (Matching Website Style) */}
       {liveDriverLocation && (
-        <div className="absolute top-4 left-4 bg-green-600 text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold animate-pulse z-10 border-2 border-white">
-          <div className="w-2 h-2 bg-white rounded-full"></div>
-          <span>LIVE TRACKING</span>
+        <div className="absolute top-4 right-4 z-10 flex flex-col gap-3">
+          <div className="bg-black/80 backdrop-blur-md border-2 border-blue-500 p-4 rounded-2xl shadow-[0_0_20px_rgba(59,130,246,0.3)] text-xs font-mono text-white space-y-1.5 min-w-[180px]">
+            <div className="font-black text-blue-400 border-b border-white/20 pb-2 mb-2 uppercase tracking-wider text-[10px]">Live Driver Data</div>
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-400">LAT:</span> 
+              <span className="text-cyan-400 font-bold">{Number(liveDriverLocation.latitude).toFixed(6)}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-400">LNG:</span> 
+              <span className="text-cyan-400 font-bold">{Number(liveDriverLocation.longitude).toFixed(6)}</span>
+            </div>
+            <div className="flex justify-between gap-4 border-t border-white/10 pt-1 mt-1">
+              <span className="text-gray-400">HEADING:</span> 
+              <span className="text-red-500 font-black text-sm">{Number(liveDriverLocation.heading || 0).toFixed(2)}°</span>
+            </div>
+          </div>
+          
+          <div className="bg-green-600/90 backdrop-blur-md text-white px-3 py-1.5 rounded-full shadow-lg flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest border border-white/20 animate-pulse">
+            <div className="w-2 h-2 bg-white rounded-full"></div>
+            <span>Live Tracking</span>
+          </div>
+        </div>
+      )}
+
+      {!liveDriverLocation && (
+        <div className="absolute top-4 left-4 bg-gray-800/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-[10px] font-black uppercase tracking-widest border border-white/10">
+          <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+          <span>Waiting for Driver GPS...</span>
         </div>
       )}
     </div>
