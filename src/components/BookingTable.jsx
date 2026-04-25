@@ -373,26 +373,9 @@ const LiveMapModalContent = ({ booking, mapType }) => {
     <div className="relative">
       <div ref={mapRef} className="w-full h-[400px] md:h-[500px] rounded-xl border-2 border-gray-200 overflow-hidden shadow-inner" />
       
-      {/* 🟢 NEW: Live Driver Data Box (Matching Website Style) */}
       {liveDriverLocation && (
-        <div className="absolute top-4 right-4 z-10 flex flex-col gap-3">
-          <div className="bg-black/80 backdrop-blur-md border-2 border-blue-500 p-4 rounded-2xl shadow-[0_0_20px_rgba(59,130,246,0.3)] text-xs font-mono text-white space-y-1.5 min-w-[180px]">
-            <div className="font-black text-blue-400 border-b border-white/20 pb-2 mb-2 uppercase tracking-wider text-[10px]">Live Driver Data</div>
-            <div className="flex justify-between gap-4">
-              <span className="text-gray-400">LAT:</span> 
-              <span className="text-cyan-400 font-bold">{Number(liveDriverLocation.latitude).toFixed(6)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-gray-400">LNG:</span> 
-              <span className="text-cyan-400 font-bold">{Number(liveDriverLocation.longitude).toFixed(6)}</span>
-            </div>
-            <div className="flex justify-between gap-4 border-t border-white/10 pt-1 mt-1">
-              <span className="text-gray-400">HEADING:</span> 
-              <span className="text-red-500 font-black text-sm">{Number(liveDriverLocation.heading || 0).toFixed(2)}°</span>
-            </div>
-          </div>
-          
-          <div className="bg-green-600/90 backdrop-blur-md text-white px-3 py-1.5 rounded-full shadow-lg flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest border border-white/20 animate-pulse">
+        <div className="absolute top-4 left-4 z-10">
+          <div className="bg-green-600/90 backdrop-blur-md text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-[10px] font-black uppercase tracking-widest border border-white/20 animate-pulse">
             <div className="w-2 h-2 bg-white rounded-full"></div>
             <span>Live Tracking</span>
           </div>
@@ -400,9 +383,11 @@ const LiveMapModalContent = ({ booking, mapType }) => {
       )}
 
       {!liveDriverLocation && (
-        <div className="absolute top-4 left-4 bg-gray-800/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-[10px] font-black uppercase tracking-widest border border-white/10">
-          <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
-          <span>Waiting for Driver GPS...</span>
+        <div className="absolute top-4 left-4 z-10">
+          <div className="bg-gray-800/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-[10px] font-black uppercase tracking-widest border border-white/10">
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+            <span>Waiting for Driver GPS...</span>
+          </div>
         </div>
       )}
     </div>
