@@ -5,7 +5,8 @@ import { useTheme } from "../../context/ThemeContext";
 import {
   FaCalendarAlt, FaTruck, FaSyncAlt, FaTrash, FaCheckCircle,
   FaMapMarkerAlt, FaPlusCircle, FaKey, FaEye, FaTimes,
-  FaPhone, FaBuilding, FaClock, FaBan, FaSpinner, FaRoute
+  FaPhone, FaBuilding, FaClock, FaBan, FaSpinner, FaRoute,
+  FaUsers, FaUserCircle
 } from "react-icons/fa";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
@@ -111,33 +112,56 @@ function DetailModal({ req, onClose, tc }) {
             </MSection>
           )}
 
-          {req.status === 'Accepted' && req.assignedFleet && (
+          {req.status !== 'Cancelled' && req.assignedFleet && (
             <MSection title="Assigned Fleet" icon={<FaBuilding style={{ color: '#16A34A' }} size={13} />} tc={tc}>
-              <MRow label="Company" value={req.assignedFleet?.companyName} tc={tc} />
-              <MRow label="Phone" value={req.assignedFleet?.phone} tc={tc} />
-              <MRow label="Accepted At" value={fmt(req.acceptedAt)} tc={tc} />
-              {req.message && <MRow label="Message" value={req.message} tc={tc} />}
+              <div className="flex items-center gap-4 p-3 rounded-xl bg-green-50/50 border border-green-100">
+                <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white bg-white shadow-sm flex items-center justify-center shrink-0">
+                  {req.assignedFleet.image ? (
+                    <img src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/uploads/${req.assignedFleet.image}`} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <FaBuilding size={20} className="text-gray-300" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold leading-tight" style={{ color: tc.text }}>{req.assignedFleet.companyName || req.assignedFleet.name}</h4>
+                  <p className="text-[11px] font-medium mt-0.5" style={{ color: tc.textSecondary }}>Owner: {req.assignedFleet.name}</p>
+                </div>
+                <a href={`tel:${req.assignedFleet.phone}`} className="p-2.5 rounded-xl bg-white text-green-600 border border-green-100 hover:bg-green-600 hover:text-white transition-all shadow-sm">
+                  <FaPhone size={14} />
+                </a>
+              </div>
+              <div className="mt-2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-100">
+                <FaClock size={10} className="text-gray-400" />
+                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Accepted {fmt(req.acceptedAt)}</span>
+              </div>
             </MSection>
           )}
 
-          {req.status === 'Ongoing' && (
-            <MSection title="Trip Info" icon={<FaTruck style={{ color: tc.info }} size={13} />} tc={tc}>
-              <MRow label="Started At" value={fmt(req.startedAt)} tc={tc} />
-              {req.assignedFleet && <MRow label="Fleet" value={req.assignedFleet?.companyName} tc={tc} />}
-            </MSection>
-          )}
-
-          {req.status === 'Completed' && (
-            <MSection title="Trip Completed" icon={<FaCheckCircle style={{ color: '#16A34A' }} size={13} />} tc={tc}>
-              <MRow label="Ended At" value={fmt(req.endedAt)} tc={tc} />
-              {req.assignedFleet && <MRow label="Fleet" value={req.assignedFleet?.companyName} tc={tc} />}
-            </MSection>
-          )}
-
-          {req.status === 'Cancelled' && (
-            <MSection title="Cancellation" icon={<FaBan style={{ color: '#DC2626' }} size={13} />} tc={tc}>
-              <MRow label="Cancelled At" value={fmt(req.cancelledAt)} tc={tc} />
-              {req.cancelReason && <MRow label="Reason" value={req.cancelReason} tc={tc} />}
+          {/* Assigned Drivers */}
+          {req.assignedDrivers && req.assignedDrivers.length > 0 && (
+            <MSection title={`Assigned Drivers (${req.assignedDrivers.length})`} icon={<FaUsers style={{ color: tc.primary }} size={13} />} tc={tc}>
+              <div className="grid grid-cols-1 gap-2 mt-1">
+                {req.assignedDrivers.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-dashed hover:border-solid transition-all" style={{ backgroundColor: tc.surface, borderColor: tc.border }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full overflow-hidden border border-white bg-gray-50 flex items-center justify-center shrink-0">
+                        {item.driver?.image ? (
+                          <img src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/uploads/${item.driver.image}`} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <FaUserCircle size={16} className="text-gray-300" />
+                        )}
+                      </div>
+                      <div>
+                        <h6 className="text-[13px] font-bold" style={{ color: tc.text }}>{item.driver?.name}</h6>
+                        <p className="text-[10px]" style={{ color: tc.textSecondary }}>{item.driver?.phone}</p>
+                      </div>
+                    </div>
+                    <a href={`tel:${item.driver?.phone}`} className="p-2 rounded-lg bg-gray-50 text-gray-400 hover:text-blue-500 transition-all">
+                      <FaPhone size={12} />
+                    </a>
+                  </div>
+                ))}
+              </div>
             </MSection>
           )}
 
@@ -420,21 +444,46 @@ export default function MyBulkBookings() {
                   </div>
                 )}
 
-                {/* Assigned Fleet */}
-                {req.status === 'Accepted' && req.assignedFleet && (
-                  <div className="mx-5 mb-4 flex items-center gap-3 px-4 py-3 rounded-xl"
-                    style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-                    <FaBuilding size={13} style={{ color: '#16A34A' }} />
-                    <div className="flex-1">
-                      <p className="text-xs font-semibold uppercase tracking-widest mb-0.5" style={{ color: '#16A34A' }}>Assigned Fleet</p>
-                      <p className="text-sm font-bold" style={{ color: '#15803D' }}>{req.assignedFleet?.companyName}</p>
+                {/* Assigned Fleet & Drivers - CARD QUICK VIEW */}
+                {req.assignedFleet && (
+                  <div className="mx-5 mb-4 p-4 rounded-xl space-y-3" style={{ backgroundColor: tc.background, border: `1px solid ${tc.border}` }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl overflow-hidden border bg-gray-50 flex items-center justify-center shrink-0" style={{ borderColor: tc.border }}>
+                          {req.assignedFleet.image ? (
+                            <img src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/uploads/${req.assignedFleet.image}`} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <FaBuilding size={16} className="text-gray-300" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: tc.primary }}>Fleet Owner</p>
+                          <h5 className="text-xs font-bold leading-tight mt-0.5" style={{ color: tc.text }}>{req.assignedFleet.companyName || req.assignedFleet.name}</h5>
+                        </div>
+                      </div>
+                      {req.assignedFleet.phone && (
+                        <a href={`tel:${req.assignedFleet.phone}`} className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-105 shadow-sm" style={{ backgroundColor: tc.primary, color: '#fff' }}>
+                          <FaPhone size={10} />
+                        </a>
+                       )}
                     </div>
-                    {req.assignedFleet?.phone && (
-                      <a href={`tel:${req.assignedFleet.phone}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
-                        style={{ backgroundColor: '#16A34A' }}>
-                        <FaPhone size={10} /> {req.assignedFleet.phone}
-                      </a>
+
+                    {/* Assigned Drivers Mini-List */}
+                    {req.assignedDrivers && req.assignedDrivers.length > 0 && (
+                      <div className="pt-3 border-t flex flex-wrap gap-2" style={{ borderColor: tc.border }}>
+                        {req.assignedDrivers.map((item, dIdx) => (
+                          <div key={dIdx} className="flex items-center gap-2 px-2 py-1 rounded-full border bg-white/50" style={{ borderColor: tc.border }}>
+                            <div className="w-5 h-5 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                              {item.driver?.image ? (
+                                <img src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/uploads/${item.driver.image}`} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <FaUserCircle size={10} className="text-gray-300" />
+                              )}
+                            </div>
+                            <span className="text-[9px] font-bold" style={{ color: tc.text }}>{item.driver?.name}</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
