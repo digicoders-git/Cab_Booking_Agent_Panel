@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { agentService, API_BASE_URL } from "../../api/agentApi";
 import {
   FaCar, FaMapMarkerAlt, FaPlus, FaMinus, FaChevronRight,
-  FaCheckCircle, FaWallet, FaInfoCircle, FaTruck, FaArrowLeft
+  FaCheckCircle, FaWallet, FaInfoCircle, FaTruck, FaArrowLeft, FaUserCircle
 } from "react-icons/fa";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
+import jsPDF from "jspdf";
 
 // --- Helper: Load Razorpay Script ---
 const loadRazorpay = () => {
@@ -30,7 +31,8 @@ export default function CreateBulkBooking() {
     tripType: "OneWay",
     returnDate: "",
     days: 1, distance: 0,
-    notes: "", priceModifier: 0
+    notes: "", priceModifier: 0,
+    customerName: "", customerPhone: ""
   });
 
   const pickupRef = useRef();
@@ -133,6 +135,185 @@ export default function CreateBulkBooking() {
     return Math.round(base + base * (formData.priceModifier / 100));
   };
 
+  const generateReceipt = (booking) => {
+    const doc = new jsPDF();
+    const logoUrl = "/logo.png";
+    
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.5);
+    doc.rect(5, 5, 200, 287); 
+
+    const img = new Image();
+    img.src = logoUrl;
+    doc.saveGraphicsState();
+    doc.setGState(new doc.GState({ opacity: 0.05 }));
+    doc.addImage(img, 'PNG', 45, 110, 120, 120);
+    doc.restoreGraphicsState();
+    
+    doc.line(5, 15, 205, 15);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("PAN: GWKPS6928H", 10, 11);
+    doc.text("TAX INVOICE", 175, 11);
+    
+    const topLogo = new Image();
+    topLogo.src = logoUrl;
+    doc.addImage(topLogo, 'PNG', 92, 18, 25, 25); 
+    
+    doc.setFontSize(28);
+    doc.setTextColor(0, 0, 0);
+    doc.text("KWIK CABS", 105, 52, { align: "center" });
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Arun Bhawan Kalu Kuwan Baberu Road, Banda UP", 105, 59, { align: "center" });
+    doc.text("MOB : +91 7310221010", 105, 64, { align: "center" });
+    
+    doc.line(5, 72, 205, 72);
+    doc.line(125, 72, 125, 125); 
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("DETAIL OF RECEIVER / CONSIGNEE", 15, 80);
+    doc.setLineWidth(0.2);
+    doc.line(15, 81, 75, 81); 
+    
+    doc.setFontSize(9);
+    doc.text("Name :", 10, 89);
+    doc.setFont("helvetica", "normal");
+    
+    let userData = {};
+    try {
+        userData = JSON.parse(localStorage.getItem('admin-data') || localStorage.getItem('user') || '{}');
+    } catch (e) {}
+
+    const userName = booking.customerName || booking.createdBy?.name || userData.name || 'Valued Customer';
+    const userPhone = booking.customerPhone || booking.createdBy?.phone || userData.phone || 'N/A';
+    const userEmail = booking.createdBy?.email || userData.email || 'N/A';
+
+    doc.text(`${userName}`, 25, 89);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Phone :", 10, 97);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${userPhone}`, 25, 97);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Email :", 10, 105);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${userEmail}`, 25, 105);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Pickup :", 10, 113);
+    doc.setFont("helvetica", "normal");
+    const pickupAddr = booking.pickup?.address || 'N/A';
+    doc.text(`${pickupAddr.slice(0, 55)}${pickupAddr.length > 55 ? '...' : ''}`, 25, 113);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Drop :", 10, 121);
+    doc.setFont("helvetica", "normal");
+    const dropAddr = booking.drop?.address || 'N/A';
+    doc.text(`${dropAddr.slice(0, 55)}${dropAddr.length > 55 ? '...' : ''}`, 25, 121);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text(`Invoice No. : PT/${booking._id?.toString().slice(-3).toUpperCase() || 'NEW'}`, 130, 80);
+    doc.text(`Invoice Date : ${new Date().toLocaleDateString('en-GB')}`, 130, 88);
+    doc.text(`Pickup Date : ${new Date(booking.pickupDateTime).toLocaleDateString('en-GB')}`, 130, 96);
+    
+    if (booking.tripType === 'RoundTrip' && booking.returnDateTime) {
+        doc.text(`Return Date : ${new Date(booking.returnDateTime).toLocaleDateString('en-GB')}`, 130, 104);
+    } else {
+        doc.text(`Duration : ${booking.numberOfDays} Day(s)`, 130, 104);
+    }
+    doc.text(`Trip Mode : ${booking.tripType}`, 130, 112);
+    
+    const tableTop = 125;
+    doc.line(5, tableTop, 205, tableTop);
+    doc.line(5, tableTop + 10, 205, tableTop + 10);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("S. NO.", 8, tableTop + 7);
+    doc.text("Description", 70, tableTop + 7, { align: "center" });
+    doc.text("Unit", 130, tableTop + 7);
+    doc.text("Qty.", 150, tableTop + 7);
+    doc.text("Rate", 170, tableTop + 7);
+    doc.text("Total", 190, tableTop + 7);
+    
+    const tableBottom = 230;
+    doc.line(18, tableTop, 18, tableBottom);
+    doc.line(125, tableTop, 125, tableBottom);
+    doc.line(145, tableTop, 145, tableBottom);
+    doc.line(165, tableTop, 165, tableBottom);
+    doc.line(185, tableTop, 185, tableBottom);
+    
+    let currentY = tableTop + 17;
+    const cars = booking.carsRequired || [];
+    
+    // 🛡️ Calculate Proportional Prices
+    // We use base rates to distribute the total offeredPrice fairly among different car types
+    const totalWeight = cars.reduce((acc, car) => {
+        const baseRate = car.category?.bulkBookingBasePrice || car.price || 1000;
+        return acc + (baseRate * car.quantity);
+    }, 0);
+
+    cars.forEach((item, index) => {
+       doc.setFont("helvetica", "normal");
+       doc.text(`${index + 1}`, 11, currentY);
+       
+       const catName = item.category?.name || item.name || 'Vehicle';
+       doc.text(`Bulk Booking - ${catName} (${booking.tripType})`, 25, currentY);
+       doc.text("NOS", 129, currentY);
+       doc.text(`${item.quantity}`, 152, currentY);
+       
+       // Calculate this category's share of the total price
+       const baseRate = item.category?.bulkBookingBasePrice || item.price || 1000;
+       const shareWeight = (baseRate * item.quantity);
+       const totalForCategory = totalWeight > 0 ? Math.round((shareWeight / totalWeight) * booking.offeredPrice) : 0;
+       const rate = item.quantity > 0 ? Math.round(totalForCategory / item.quantity) : 0;
+       
+       doc.text(`${rate.toLocaleString()}`, 168, currentY);
+       doc.setFont("helvetica", "bold");
+       doc.text(`${totalForCategory.toLocaleString()}`, 188, currentY);
+       
+       doc.line(5, currentY + 3, 205, currentY + 3); 
+       currentY += 10;
+    });
+    
+    for(let i = currentY; i < tableBottom; i += 10) {
+        doc.line(5, i, 205, i);
+    }
+    doc.line(5, tableBottom, 205, tableBottom);
+    
+    doc.setFont("helvetica", "bold");
+    const advancePaid = Math.round(booking.offeredPrice * 0.25);
+    const remainingBalance = booking.offeredPrice - advancePaid;
+
+    doc.text("TOTAL PRICE", 130, tableBottom + 7);
+    doc.text(`${booking.offeredPrice.toLocaleString()}`, 185, tableBottom + 7);
+    doc.line(80, tableBottom + 10, 205, tableBottom + 10);
+    
+    doc.text("ADVANCE PAID (25%)", 130, tableBottom + 17);
+    doc.text(`${advancePaid.toLocaleString()}`, 185, tableBottom + 17);
+    doc.line(80, tableBottom + 20, 205, tableBottom + 20);
+    
+    doc.setFillColor(230, 230, 230);
+    doc.rect(80, tableBottom + 20, 125, 10, 'F');
+    doc.text("REMAINING BALANCE", 130, tableBottom + 27);
+    doc.text(`INR ${remainingBalance.toLocaleString()}`, 185, tableBottom + 27);
+    doc.line(80, tableBottom + 30, 205, tableBottom + 30);
+    
+    doc.setFontSize(8);
+    doc.text(`Total Amount (in words) : RUPEES ${booking.offeredPrice.toLocaleString()} ONLY`, 10, tableBottom + 35);
+    doc.text(`Note: Balance of INR ${remainingBalance.toLocaleString()} to be paid directly to the fleet owner.`, 10, tableBottom + 40);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("For KWIK CABS", 150, tableBottom + 50);
+    doc.line(140, tableBottom + 75, 200, tableBottom + 75);
+    doc.text("Authorized Signatory", 155, tableBottom + 82);
+    
+    doc.save(`KwikCabs_Receipt_${booking._id?.toString().slice(-6) || 'Agent'}.pdf`);
+  };
+
   const handleSubmit = async () => {
     if (selectedCars.length === 0) return toast.error("Please select at least one vehicle");
     if (!formData.pickup || !formData.drop || !formData.date) return toast.error("Please fill all required fields");
@@ -151,7 +332,7 @@ export default function CreateBulkBooking() {
 
     try {
       setSubmitting(true);
-      const res = await agentService.createBulkBooking({
+      const payload = {
         pickup: { address: formData.pickup, latitude: formData.pickupCoords.lat, longitude: formData.pickupCoords.lng },
         drop: { address: formData.drop, latitude: formData.dropCoords.lat, longitude: formData.dropCoords.lng },
         pickupDateTime: `${formData.date}T${formData.time}`,
@@ -159,15 +340,23 @@ export default function CreateBulkBooking() {
         returnDateTime: formData.tripType === 'RoundTrip' ? `${formData.returnDate}T${formData.time}` : null,
         numberOfDays: formData.days,
         totalDistance: formData.distance,
-        carsRequired: selectedCars.map(c => ({ category: c.id, quantity: c.quantity })),
+        carsRequired: selectedCars.map(c => ({ 
+            category: { _id: c.id, name: c.name, bulkBookingBasePrice: c.price }, 
+            quantity: c.quantity,
+            name: c.name, // Fallback
+            price: c.price // Fallback
+        })),
         offeredPrice: total,
         notes: formData.notes,
-      });
+        customerName: formData.customerName,
+        customerPhone: formData.customerPhone,
+      };
+
+      const res = await agentService.createBulkBooking(payload);
 
       if (res.success) {
         const { bookingId, advanceAmount } = res;
         
-        // 💳 START RAZORPAY PAYMENT
         const resScript = await loadRazorpay();
         if (!resScript) {
           toast.error("Razorpay SDK failed to load");
@@ -177,7 +366,7 @@ export default function CreateBulkBooking() {
 
         const options = {
           key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-          amount: advanceAmount * 100, // in paise
+          amount: advanceAmount * 100, 
           currency: "INR",
           name: "Agent Bulk Advance",
           description: "25% Advance for Bulk Booking",
@@ -191,6 +380,7 @@ export default function CreateBulkBooking() {
               });
               if (verifyRes.success) {
                 toast.success("Advance Paid! Request Live on Marketplace.");
+                generateReceipt({ ...payload, _id: bookingId });
                 navigate("/agent/my-bulk-bookings");
               }
             } catch (err) {
@@ -199,9 +389,7 @@ export default function CreateBulkBooking() {
               setSubmitting(false);
             }
           },
-          prefill: {
-            name: "Agent",
-          },
+          prefill: { name: "Agent" },
           theme: { color: "#2563EB" },
         };
 
@@ -214,7 +402,6 @@ export default function CreateBulkBooking() {
       setSubmitting(false);
     }
   };
-
   if (loading) return (
     <div className="h-screen flex items-center justify-center bg-gray-50">
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
@@ -247,6 +434,35 @@ export default function CreateBulkBooking() {
 
         {/* LEFT: Main Form */}
         <div className="xl:col-span-8 space-y-5">
+
+          {/* Customer Information */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
+              <FaUserCircle className="text-purple-600" /> Customer Information
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Customer Name</label>
+                <input
+                  type="text"
+                  value={formData.customerName}
+                  onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  placeholder="Enter customer name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Customer Phone</label>
+                <input
+                  type="text"
+                  value={formData.customerPhone}
+                  onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  placeholder="Enter phone number"
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Fleet Selection */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
