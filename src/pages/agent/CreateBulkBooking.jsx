@@ -285,26 +285,27 @@ export default function CreateBulkBooking() {
     doc.line(5, tableBottom, 205, tableBottom);
     
     doc.setFont("helvetica", "bold");
-    const advancePaid = Math.round(booking.offeredPrice * 0.25);
-    const remainingBalance = booking.offeredPrice - advancePaid;
+    const advAmt = booking.advancePayment?.amount || Math.round(booking.offeredPrice * 0.25);
+    const advPercent = Math.round((advAmt / booking.offeredPrice) * 100);
+    const remBal = booking.offeredPrice - advAmt;
 
     doc.text("TOTAL PRICE", 130, tableBottom + 7);
     doc.text(`${booking.offeredPrice.toLocaleString()}`, 185, tableBottom + 7);
     doc.line(80, tableBottom + 10, 205, tableBottom + 10);
     
-    doc.text("ADVANCE PAID (25%)", 130, tableBottom + 17);
-    doc.text(`${advancePaid.toLocaleString()}`, 185, tableBottom + 17);
+    doc.text(`ADVANCE PAID (${advPercent}%)`, 130, tableBottom + 17);
+    doc.text(`${advAmt.toLocaleString()}`, 185, tableBottom + 17);
     doc.line(80, tableBottom + 20, 205, tableBottom + 20);
     
     doc.setFillColor(230, 230, 230);
     doc.rect(80, tableBottom + 20, 125, 10, 'F');
     doc.text("REMAINING BALANCE", 130, tableBottom + 27);
-    doc.text(`INR ${remainingBalance.toLocaleString()}`, 185, tableBottom + 27);
+    doc.text(`INR ${remBal.toLocaleString()}`, 185, tableBottom + 27);
     doc.line(80, tableBottom + 30, 205, tableBottom + 30);
     
     doc.setFontSize(8);
     doc.text(`Total Amount (in words) : RUPEES ${booking.offeredPrice.toLocaleString()} ONLY`, 10, tableBottom + 35);
-    doc.text(`Note: Balance of INR ${remainingBalance.toLocaleString()} to be paid directly to the fleet owner.`, 10, tableBottom + 40);
+    doc.text(`Note: Balance of INR ${remBal.toLocaleString()} to be paid directly to the fleet owner.`, 10, tableBottom + 40);
     
     doc.setFont("helvetica", "bold");
     doc.text("For KWIK CABS", 150, tableBottom + 50);
@@ -317,6 +318,7 @@ export default function CreateBulkBooking() {
   const handleSubmit = async () => {
     if (selectedCars.length === 0) return toast.error("Please select at least one vehicle");
     if (!formData.pickup || !formData.drop || !formData.date) return toast.error("Please fill all required fields");
+    if (!formData.customerName || !formData.customerPhone) return toast.error("Customer Name and Phone are required");
 
     const total = calculateTotal();
     const result = await Swal.fire({
@@ -380,7 +382,12 @@ export default function CreateBulkBooking() {
               });
               if (verifyRes.success) {
                 toast.success("Advance Paid! Request Live on Marketplace.");
-                generateReceipt({ ...payload, _id: bookingId });
+                // Pass the real advance amount to the receipt generator
+                generateReceipt({ 
+                  ...payload, 
+                  _id: bookingId, 
+                  advancePayment: { amount: advanceAmount } 
+                });
                 navigate("/agent/my-bulk-bookings");
               }
             } catch (err) {
@@ -442,7 +449,7 @@ export default function CreateBulkBooking() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Customer Name</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Customer Name *</label>
                 <input
                   type="text"
                   value={formData.customerName}
@@ -452,7 +459,7 @@ export default function CreateBulkBooking() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Customer Phone</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Customer Phone *</label>
                 <input
                   type="text"
                   value={formData.customerPhone}

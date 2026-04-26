@@ -643,17 +643,20 @@ const generateReceipt = (booking) => {
   });
   for(let i = currentY; i < tableBottom; i += 10) { doc.line(5, i, 205, i); }
   doc.line(5, tableBottom, 205, tableBottom);
-  doc.setFont("helvetica", "bold"); const advancePaid = Math.round(booking.offeredPrice * 0.25);
-  const remainingBalance = booking.offeredPrice - advancePaid;
+  doc.setFont("helvetica", "bold"); 
+  const advAmt = booking.advancePayment?.amount || Math.round(booking.offeredPrice * 0.25);
+  const advPercent = Math.round((advAmt / booking.offeredPrice) * 100);
+  const remBal = booking.offeredPrice - advAmt;
+
   doc.text("TOTAL PRICE", 130, tableBottom + 7); doc.text(`${booking.offeredPrice.toLocaleString()}`, 185, tableBottom + 7);
   doc.line(80, tableBottom + 10, 205, tableBottom + 10);
-  doc.text("ADVANCE PAID (25%)", 130, tableBottom + 17); doc.text(`${advancePaid.toLocaleString()}`, 185, tableBottom + 17);
+  doc.text(`ADVANCE PAID (${advPercent}%)`, 130, tableBottom + 17); doc.text(`${advAmt.toLocaleString()}`, 185, tableBottom + 17);
   doc.line(80, tableBottom + 20, 205, tableBottom + 20);
   doc.setFillColor(230, 230, 230); doc.rect(80, tableBottom + 20, 125, 10, 'F');
-  doc.text("REMAINING BALANCE", 130, tableBottom + 27); doc.text(`INR ${remainingBalance.toLocaleString()}`, 185, tableBottom + 27);
+  doc.text("REMAINING BALANCE", 130, tableBottom + 27); doc.text(`INR ${remBal.toLocaleString()}`, 185, tableBottom + 27);
   doc.line(80, tableBottom + 30, 205, tableBottom + 30);
   doc.setFontSize(8); doc.text(`Total Amount (in words) : RUPEES ${booking.offeredPrice.toLocaleString()} ONLY`, 10, tableBottom + 35);
-  doc.text(`Note: Balance of INR ${remainingBalance.toLocaleString()} to be paid directly to the fleet owner.`, 10, tableBottom + 40);
+  doc.text(`Note: Balance of INR ${remBal.toLocaleString()} to be paid directly to the fleet owner.`, 10, tableBottom + 40);
   doc.setFont("helvetica", "bold"); doc.text("For KWIK CABS", 150, tableBottom + 50);
   doc.line(140, tableBottom + 75, 200, tableBottom + 75); doc.text("Authorized Signatory", 155, tableBottom + 82);
   doc.save(`KwikCabs_Receipt_${booking._id?.toString().slice(-6) || 'Agent'}.pdf`);
