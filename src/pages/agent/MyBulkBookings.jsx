@@ -213,7 +213,18 @@ export default function MyBulkBookings() {
   const [activeTab, setActiveTab] = useState('active');
   const [selectedReq, setSelectedReq] = useState(null);
 
-  useEffect(() => { fetchRequests(); }, []);
+  useEffect(() => { 
+    fetchRequests(); 
+    
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('success') === 'true') {
+      toast.success("Payment verified! Booking is live on Marketplace.");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (params.get('error')) {
+      toast.error(`Payment failed: ${params.get('error')}`);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   // 🔔 Listen for real-time socket updates
   useEffect(() => {
