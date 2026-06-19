@@ -87,6 +87,15 @@ export default function AgentLogin() {
             )}
           </button>
         </form>
+
+        <div className="mt-6 text-center">
+          <p className="text-gray-600 text-sm">
+            New Agent?{' '}
+            <a href="/agent/register" className="text-blue-600 hover:text-blue-700 font-semibold transition-colors">
+              Register Here
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

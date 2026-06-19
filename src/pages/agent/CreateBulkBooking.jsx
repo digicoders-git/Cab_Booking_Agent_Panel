@@ -348,7 +348,12 @@ export default function CreateBulkBooking() {
       const res = await agentService.createBulkBooking(payload);
 
       if (res.success) {
-        if (res.paymentLinks && res.paymentLinks.web) {
+        if (res.walletDeducted) {
+          // Bypass logic success
+          toast.success("Booking successful! Advance deducted from wallet.");
+          navigate("/agent/my-bulk-bookings");
+        } else if (res.paymentLinks && res.paymentLinks.web) {
+          // Standard Bank Payment Flow
           toast.success("Redirecting to secure payment...");
           window.location.href = res.paymentLinks.web;
         } else {
@@ -356,7 +361,9 @@ export default function CreateBulkBooking() {
         }
       }
     } catch (err) {
-      toast.error(err.message || "Submission failed. Please try again.");
+      // Handle the -3000 wallet limit error properly
+      const errMsg = err.response?.data?.message || err.message || "Submission failed. Please try again.";
+      toast.error(errMsg);
     } finally {
       setSubmitting(false);
     }

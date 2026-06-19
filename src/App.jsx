@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "r
 import { Suspense, useEffect } from "react";
 import { useAuth } from "./context/AuthContext";
 import AgentLogin from "./pages/agent/AgentLogin";
+import AgentRegister from "./pages/agent/AgentRegister";
 import DashboardLayout from "./components/DashboardLayout";
 import { Toaster } from "sonner";
 import routes from "./route/SidebarRaoute";
@@ -40,6 +41,10 @@ function App() {
         <Route 
           path="/agent/login" 
           element={isLoggedIn ? <Navigate to="/agent/dashboard" replace /> : <AgentLogin />} 
+        />
+        <Route 
+          path="/agent/register" 
+          element={isLoggedIn ? <Navigate to="/agent/dashboard" replace /> : <AgentRegister />} 
         />
 
         {/* Protected Routes */}
