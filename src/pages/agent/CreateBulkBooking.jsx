@@ -17,13 +17,15 @@ export default function CreateBulkBooking() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedCars, setSelectedCars] = useState([]);
+  const [estimatedTax, setEstimatedTax] = useState(0);
   const [formData, setFormData] = useState({
     date: "", time: "10:00",
     tripType: "OneWay",
     returnDate: "",
     days: 1, distance: 0,
     notes: "", priceModifier: 0,
-    customerName: "", customerPhone: ""
+    customerName: "", customerPhone: "",
+    isOutstation: false
   });
 
   const pickupRef = useRef();
@@ -45,6 +47,19 @@ export default function CreateBulkBooking() {
         setFormData(prev => ({ ...prev, days: diffDays }));
     }
   }, [formData.date, formData.returnDate, formData.tripType]);
+
+  // 🕒 Check MCD/State Tax
+  useEffect(() => {
+      if (formData.isOutstation && formData.pickupCoords?.lat) {
+          agentService.checkTax(formData.pickupCoords.lat, formData.pickupCoords.lng)
+            .then(res => {
+                if (res.success) setEstimatedTax(res.tax);
+            })
+            .catch(() => setEstimatedTax(0));
+      } else {
+          setEstimatedTax(0);
+      }
+  }, [formData.isOutstation, formData.pickupCoords]);
 
   const initAutocomplete = () => {
     if (!window.google || !pickupRef.current || !dropRef.current) return;
@@ -124,6 +139,12 @@ export default function CreateBulkBooking() {
     const distanceMultiplier = formData.tripType === 'RoundTrip' ? 2 : 1;
     const base = selectedCars.reduce((acc, car) => acc + car.price * car.quantity * formData.days * ((formData.distance || 0) * distanceMultiplier), 0);
     return Math.round(base + base * (formData.priceModifier / 100));
+  };
+
+  const getUiTotal = () => {
+      const base = calculateTotal();
+      const totalTax = estimatedTax * selectedCars.reduce((a, c) => a + c.quantity, 0);
+      return formData.isOutstation ? base + totalTax : base;
   };
 
   const generateReceipt = (booking) => {
@@ -343,11 +364,20 @@ export default function CreateBulkBooking() {
         notes: formData.notes,
         customerName: formData.customerName,
         customerPhone: formData.customerPhone,
+        isOutstation: formData.isOutstation
       };
 
       const res = await agentService.createBulkBooking(payload);
 
       if (res.success) {
+        if (res.tollTaxMessage) {
+            await Swal.fire({
+                title: 'Outstation Ride Note',
+                text: res.tollTaxMessage,
+                icon: 'info',
+                confirmButtonColor: '#2563EB'
+            });
+        }
         if (res.walletDeducted) {
           // Bypass logic success
           toast.success("Booking successful! Advance deducted from wallet.");
@@ -541,6 +571,22 @@ export default function CreateBulkBooking() {
                 </div>
               </div>
 
+              {/* Outstation Checkbox */}
+              <div className="sm:col-span-2 mt-2">
+                  <label className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-xl cursor-pointer hover:bg-red-100 transition-all">
+                      <input
+                          type="checkbox"
+                          checked={formData.isOutstation}
+                          onChange={(e) => setFormData({ ...formData, isOutstation: e.target.checked })}
+                          className="w-5 h-5 accent-red-600 rounded cursor-pointer"
+                      />
+                      <div>
+                          <p className="text-sm font-bold text-red-700">This is an Outstation Ride</p>
+                          <p className="text-[10px] text-red-600">Tick this box if the cab will cross state/city borders. Toll/State Tax applies.</p>
+                      </div>
+                  </label>
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Reporting Date *</label>
                 <input
@@ -658,10 +704,25 @@ export default function CreateBulkBooking() {
                 <p className="text-xs text-gray-400 mt-1.5">Adjust to attract fleet owners faster</p>
               </div>
 
+              {/* Total Tax (Outstation) */}
+              {formData.isOutstation && estimatedTax > 0 && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-bold text-red-700">MCD/State Tax (Included in Total)</span>
+                    <span className="text-sm font-bold text-red-700">
+                      ₹{(estimatedTax * selectedCars.reduce((a, c) => a + c.quantity, 0)).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-red-600">
+                    ₹{estimatedTax} per car × {selectedCars.reduce((a, c) => a + c.quantity, 0)} cars. Will be collected by driver.
+                  </p>
+                </div>
+              )}
+
               {/* Total */}
               <div className="bg-blue-600 rounded-xl p-4 text-white text-center mb-4">
                 <p className="text-xs font-medium opacity-80 mb-1">Total Offered Amount</p>
-                <p className="text-3xl font-bold">₹{calculateTotal().toLocaleString()}</p>
+                <p className="text-3xl font-bold">₹{getUiTotal().toLocaleString()}</p>
               </div>
 
               <button

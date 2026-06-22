@@ -131,6 +131,10 @@ export const agentService = {
   verifyBulkPayment: async (data) => {
     const response = await agentApi.post('/api/bulk-bookings/verify-payment', data);
     return response.data;
-  }
+  },
 
+  checkTax: async (lat, lng) => {
+    const response = await agentApi.get(`/api/area-pricing/check-tax?lat=${lat}&lng=${lng}`);
+    return response.data;
+  }
 };

@@ -101,6 +101,12 @@ function DetailModal({ req, onClose, tc }) {
 
           <MSection title="Pricing" icon={<span className="text-sm font-bold" style={{ color: '#16A34A' }}>₹</span>} tc={tc}>
             <MRow label="Offered Price" value={`₹${req.offeredPrice?.toLocaleString()}`} tc={tc} highlight />
+            {req.isOutstation && req.mcdStateTaxApplied > 0 && (
+                <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-xl">
+                    <p className="text-xs font-bold text-red-700">MCD/State Tax Included: ₹{req.mcdStateTaxApplied.toLocaleString()}</p>
+                    <p className="text-[10px] text-red-600 mt-0.5">Please pay this tax directly to the driver during the trip.</p>
+                </div>
+            )}
           </MSection>
 
           {req.status === 'Marketplace' && (
@@ -372,6 +378,11 @@ export default function MyBulkBookings() {
                       <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${req.tripType === 'RoundTrip' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
                         {req.tripType === 'RoundTrip' ? 'Round' : 'One-Way'}
                       </span>
+                      {req.isOutstation && (
+                          <span className="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border bg-red-50 text-red-600 border-red-200 flex items-center gap-1">
+                              <FaRoute size={10} /> OUTSTATION
+                          </span>
+                      )}
                       <span className="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5"
                         style={{ backgroundColor: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
                         {cfg.dot && (
