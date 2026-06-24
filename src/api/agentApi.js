@@ -4,7 +4,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localho
 
 console.log('🔗 API Base URL:', API_BASE_URL);
 
-const agentApi = axios.create({
+export const agentApi = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' }
 });
