@@ -14,3 +14,10 @@ export const cancelAgentLead = async (leadId) => {
     const response = await agentApi.post(`/api/agent-leads/${leadId}/cancel`);
     return response.data;
 };
+
+export const downloadAgentLeadReceipt = async (leadId) => {
+    const response = await agentApi.get(`/api/agent-leads/receipt/${leadId}`, {
+        responseType: 'blob'
+    });
+    return response.data;
+};

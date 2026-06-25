@@ -136,5 +136,12 @@ export const agentService = {
   checkTax: async (lat, lng) => {
     const response = await agentApi.get(`/api/area-pricing/check-tax?lat=${lat}&lng=${lng}`);
     return response.data;
+  },
+
+  downloadBulkReceipt: async (bookingId) => {
+    const response = await agentApi.get(`/api/bulk-bookings/receipt/${bookingId}`, {
+      responseType: 'blob'
+    });
+    return response.data;
   }
 };

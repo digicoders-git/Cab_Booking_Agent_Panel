@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { getMyAgentLeads, cancelAgentLead } from "../../apis/agentLead";
+import { getMyAgentLeads, cancelAgentLead, downloadAgentLeadReceipt } from "../../apis/agentLead";
 import Swal from "sweetalert2";
-import { FaSyncAlt, FaTimesCircle, FaCar, FaMapMarkerAlt, FaBriefcase } from "react-icons/fa";
+import { toast } from "sonner";
+import { FaSyncAlt, FaTimesCircle, FaCar, FaMapMarkerAlt, FaBriefcase, FaDownload } from "react-icons/fa";
 
 export default function MyAgentLeads() {
   const [leads, setLeads] = useState([]);
@@ -51,6 +52,27 @@ export default function MyAgentLeads() {
       } catch (err) {
         Swal.fire('Error!', 'Server error', 'error');
       }
+    }
+  };
+
+  const handleDownloadReceipt = async (leadId) => {
+    try {
+      toast.loading("Generating receipt...");
+      const blob = await downloadAgentLeadReceipt(leadId);
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `KwikCabs_Lead_${leadId.toString().slice(-6).toUpperCase()}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.dismiss();
+      toast.success("Receipt downloaded successfully!");
+    } catch (error) {
+      toast.dismiss();
+      console.error("Receipt generation failed:", error);
+      toast.error("Failed to generate receipt from server.");
     }
   };
 
@@ -177,15 +199,24 @@ export default function MyAgentLeads() {
                         </span>
                       </td>
                       <td className="py-4 px-6 text-center">
-                        {['Marketplace', 'Accepted'].includes(lead.status) && (
+                        <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => handleCancelLead(lead._id)}
-                            className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                            title="Cancel Lead"
+                            onClick={() => handleDownloadReceipt(lead._id)}
+                            className="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors"
+                            title="Download Receipt"
                           >
-                            <FaTimesCircle size={18} />
+                            <FaDownload size={16} />
                           </button>
-                        )}
+                          {['Marketplace', 'Accepted'].includes(lead.status) && (
+                            <button
+                              onClick={() => handleCancelLead(lead._id)}
+                              className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                              title="Cancel Lead"
+                            >
+                              <FaTimesCircle size={18} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
