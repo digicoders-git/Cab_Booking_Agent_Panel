@@ -4,6 +4,7 @@ import { getMyAgentLeads, cancelAgentLead, downloadAgentLeadReceipt } from "../.
 import Swal from "sweetalert2";
 import { toast } from "sonner";
 import { FaSyncAlt, FaTimesCircle, FaCar, FaMapMarkerAlt, FaBriefcase, FaDownload } from "react-icons/fa";
+import { API_BASE_URL } from "../../api/agentApi";
 
 export default function MyAgentLeads() {
   const [leads, setLeads] = useState([]);
@@ -173,7 +174,7 @@ export default function MyAgentLeads() {
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
                               {lead.assignedDriver.image ? (
-                                <img src={`http://localhost:5000/uploads/${lead.assignedDriver.image}`} className="w-full h-full object-cover" />
+                                <img src={`${API_BASE_URL}/uploads/${lead.assignedDriver.image}`} className="w-full h-full object-cover" />
                               ) : (
                                 <FaCar className="text-gray-400" />
                               )}
