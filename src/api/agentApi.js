@@ -143,5 +143,11 @@ export const agentService = {
       responseType: 'blob'
     });
     return response.data;
+  },
+
+  // Rating
+  rateDriver: async (bookingId, data) => {
+    const response = await agentApi.post(`/api/bookings/${bookingId}/rate-driver`, data);
+    return response.data;
   }
 };

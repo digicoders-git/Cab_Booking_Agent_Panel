@@ -58,6 +58,20 @@ export default function CreateBooking() {
     // Step 5: Schedule
     const [creating, setCreating] = useState(false);
 
+    // Global App Settings
+    const [isShareRideEnabled, setIsShareRideEnabled] = useState(true);
+
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/api/settings`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.settings) {
+                    setIsShareRideEnabled(data.settings.isShareRideEnabled);
+                }
+            })
+            .catch(err => console.error("Error fetching app settings:", err));
+    }, []);
+
     // Wait for Google Maps to load
     useEffect(() => {
         const checkMapsLoaded = async () => {
@@ -810,7 +824,7 @@ export default function CreateBooking() {
                             Choose Ride Type
                         </h2>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className={`grid grid-cols-1 ${isShareRideEnabled ? 'sm:grid-cols-2' : ''} gap-4 max-w-2xl`}>
                             <button
                                 onClick={() => handleRideTypeSelect('Private')}
                                 disabled={searchingCabs}
@@ -822,17 +836,19 @@ export default function CreateBooking() {
                                     <p className="text-xs text-gray-500 mt-1">Direct & Fast</p>
                                 </div>
                             </button>
-                            <button
-                                onClick={() => handleRideTypeSelect('Shared')}
-                                disabled={searchingCabs}
-                                className="p-6 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center gap-3 disabled:opacity-50"
-                            >
-                                <FaUsers size={32} className="text-blue-600" />
-                                <div className="text-center">
-                                    <p className="font-bold text-lg">Shared Ride</p>
-                                    <p className="text-xs text-gray-500 mt-1">Wait & Save</p>
-                                </div>
-                            </button>
+                            {isShareRideEnabled && (
+                                <button
+                                    onClick={() => handleRideTypeSelect('Shared')}
+                                    disabled={searchingCabs}
+                                    className="p-6 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center gap-3 disabled:opacity-50"
+                                >
+                                    <FaUsers size={32} className="text-blue-600" />
+                                    <div className="text-center">
+                                        <p className="font-bold text-lg">Shared Ride</p>
+                                        <p className="text-xs text-gray-500 mt-1">Wait & Save</p>
+                                    </div>
+                                </button>
+                            )}
                         </div>
 
                         {searchingCabs && (

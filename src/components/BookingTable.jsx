@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { agentService, API_BASE_URL } from '../api/agentApi';
 import { toast } from 'sonner';
+import RatingModal from './RatingModal';
 
 // --- LIVE MAP COMPONENT ---
 const LiveMapModalContent = ({ booking, mapType }) => {
@@ -516,6 +517,7 @@ const BookingRow = ({ booking, onRefresh }) => {
   const [cancelReason, setCancelReason] = useState('');
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapType, setMapType] = useState('route'); // 'route', 'pickup', 'drop'
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   // Debug: Log when booking prop changes
   useEffect(() => {
@@ -725,6 +727,27 @@ const BookingRow = ({ booking, onRefresh }) => {
                   }
                 </p>
               </div>
+              
+              {/* Rating Section */}
+              {booking.bookingStatus?.toLowerCase() === 'completed' && (
+                <div className="bg-white rounded-lg p-2.5 border border-gray-100">
+                  <p className="text-gray-400 uppercase mb-1">Rate Driver</p>
+                  {booking.driverRating ? (
+                    <div className="flex items-center gap-1 text-yellow-500 font-bold">
+                      {'★'.repeat(booking.driverRating)}{'☆'.repeat(5 - booking.driverRating)}
+                      <span className="text-gray-800 ml-1 text-sm">{booking.driverRating}/5</span>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => setShowRatingModal(true)}
+                      className="w-full py-1.5 bg-yellow-100 text-yellow-700 rounded text-xs font-bold hover:bg-yellow-200 transition-colors"
+                    >
+                      Rate Driver Now
+                    </button>
+                  )}
+                </div>
+              )}
+
               {booking.selectedSeats?.length > 0 && (
                 <div className="bg-white rounded-lg p-2.5 border border-gray-100">
                   <p className="text-gray-400 uppercase mb-1">Selected Seats</p>
@@ -1049,6 +1072,17 @@ const BookingRow = ({ booking, onRefresh }) => {
           </td>
         </tr>
       )}
+
+      {/* Rating Modal */}
+      <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => setShowRatingModal(false)}
+          bookingId={booking._id}
+          targetName={typeof booking.assignedDriver === 'object' ? booking.assignedDriver?.name : booking.assignedDriver}
+          onRatingSuccess={(id, rating) => {
+              if (onRefresh) onRefresh();
+          }}
+      />
     </>
   );
 };
