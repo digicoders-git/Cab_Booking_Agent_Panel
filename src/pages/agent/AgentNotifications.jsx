@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import {
   FaBell, FaSync, FaRegClock, FaCircle,
   FaExclamationCircle, FaInfoCircle, FaBullhorn, FaCheckDouble,
-  FaTrash
+  FaTrash, FaTimes, FaMoneyBillWave
 } from 'react-icons/fa';
 import { BellOff, Trash2 } from 'lucide-react';
 
@@ -13,6 +13,10 @@ export default function AgentNotifications() {
   const { setUnreadCount } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [previewImage, setPreviewImage] = useState(null);
+
+  const BASE = import.meta.env.VITE_API_BASE_URL || '';
+  const IMAGE_BASE_URL = BASE.replace(/\/api\/?$/, '').replace(/\/$/, '');
 
   const fetchNotifications = async () => {
     try {
@@ -157,12 +161,50 @@ export default function AgentNotifications() {
                       <p className="text-sm text-gray-600 leading-relaxed">
                         {n.message}
                       </p>
+                      {n.mediaUrl && (
+                        <div 
+                          className="mt-3 cursor-pointer w-fit overflow-hidden rounded-xl border border-gray-200 shadow-sm hover:opacity-90 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewImage(`${IMAGE_BASE_URL}${n.mediaUrl}`);
+                          }}
+                        >
+                          {n.mediaUrl.match(/\.(mp4|webm|ogg)$/i) ? (
+                            <div className="bg-gray-100 flex items-center justify-center p-8">
+                              <span className="text-sm font-bold text-gray-500 uppercase flex items-center gap-2">
+                                <FaRegClock /> Play Video
+                              </span>
+                            </div>
+                          ) : (
+                            <img src={`${IMAGE_BASE_URL}${n.mediaUrl}`} className="max-h-48 object-contain" alt="Attachment" />
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setPreviewImage(null)}>
+          <div className="relative max-w-4xl max-h-[90vh] w-full bg-transparent flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <button 
+              onClick={() => setPreviewImage(null)}
+              className="absolute -top-12 right-0 p-2 text-white hover:text-gray-300 transition-colors"
+            >
+              <FaTimes size={24} />
+            </button>
+            {previewImage.match(/\.(mp4|webm|ogg)$/i) ? (
+              <video src={previewImage} controls autoPlay className="max-w-full max-h-[85vh] rounded-lg shadow-2xl" />
+            ) : (
+              <img src={previewImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+            )}
+          </div>
         </div>
       )}
     </div>
