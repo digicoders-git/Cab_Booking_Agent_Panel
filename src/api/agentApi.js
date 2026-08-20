@@ -138,6 +138,11 @@ export const agentService = {
     return response.data;
   },
 
+  checkAreaSurcharge: async (data) => {
+    const response = await agentApi.post('/api/bulk-bookings/check-surcharge', data);
+    return response.data;
+  },
+
   downloadBulkReceipt: async (bookingId) => {
     const response = await agentApi.get(`/api/bulk-bookings/receipt/${bookingId}`, {
       responseType: 'blob'

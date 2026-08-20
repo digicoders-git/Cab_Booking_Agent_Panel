@@ -18,6 +18,7 @@ export default function CreateBulkBooking() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedCars, setSelectedCars] = useState([]);
   const [estimatedTax, setEstimatedTax] = useState(0);
+  const [areaMultiplier, setAreaMultiplier] = useState(1);
   const [formData, setFormData] = useState({
     date: "", time: "10:00",
     tripType: "OneWay",
@@ -60,6 +61,22 @@ export default function CreateBulkBooking() {
           setEstimatedTax(0);
       }
   }, [formData.isOutstation, formData.pickupCoords]);
+
+  // 📍 Check Area Surcharge
+  useEffect(() => {
+    if (formData.pickupCoords?.lat && formData.pickupCoords?.lng) {
+      agentService.checkAreaSurcharge({ 
+        latitude: formData.pickupCoords.lat, 
+        longitude: formData.pickupCoords.lng 
+      })
+      .then(res => {
+        setAreaMultiplier(res.multiplier || 1);
+      })
+      .catch(() => setAreaMultiplier(1));
+    } else {
+      setAreaMultiplier(1);
+    }
+  }, [formData.pickupCoords]);
 
   const initAutocomplete = () => {
     if (!window.google || !pickupRef.current || !dropRef.current) return;
@@ -137,7 +154,11 @@ export default function CreateBulkBooking() {
 
   const calculateTotal = () => {
     const distanceMultiplier = formData.tripType === 'RoundTrip' ? 2 : 1;
-    const base = selectedCars.reduce((acc, car) => acc + car.price * car.quantity * formData.days * ((formData.distance || 0) * distanceMultiplier), 0);
+    let base = selectedCars.reduce((acc, car) => acc + car.price * car.quantity * formData.days * ((formData.distance || 0) * distanceMultiplier), 0);
+    
+    // Apply area surcharge multiplier
+    base = base * areaMultiplier;
+    
     return Math.round(base + base * (formData.priceModifier / 100));
   };
 
@@ -460,72 +481,6 @@ export default function CreateBulkBooking() {
             </div>
           </div>
 
-          {/* Fleet Selection */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <FaCar className="text-blue-600" /> Select Fleet
-              </h2>
-              {selectedCars.length > 0 && (
-                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
-                  {selectedCars.reduce((a, c) => a + c.quantity, 0)} selected
-                </span>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {categories.map(cat => {
-                const sel = selectedCars.find(s => s.id === cat._id);
-                return (
-                  <div
-                    key={cat._id}
-                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
-                      sel ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center p-1.5 relative">
-                        <img
-                          src={`${API_BASE_URL}/uploads/${cat.image}`}
-                          alt={cat.name}
-                          className="w-full h-full object-contain"
-                          onError={e => { e.target.style.display = 'none'; }}
-                        />
-                        {sel && (
-                          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
-                            <FaCheckCircle className="text-white text-[8px]" />
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">{cat.name}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">₹{cat.bulkBookingBasePrice || 0}/km</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleRemoveCar(cat._id)}
-                        className="w-7 h-7 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:border-red-300 hover:text-red-500 transition-all"
-                      >
-                        <FaMinus size={10} />
-                      </button>
-                      <span className="text-sm font-bold text-gray-800 w-5 text-center">
-                        {sel?.quantity || 0}
-                      </span>
-                      <button
-                        onClick={() => handleAddCar(cat)}
-                        className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition-all"
-                      >
-                        <FaPlus size={10} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Route & Schedule */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-4">
@@ -653,6 +608,72 @@ export default function CreateBulkBooking() {
                   placeholder="AC required, luggage space, driver preferences..."
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Fleet Selection */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <FaCar className="text-blue-600" /> Select Fleet
+              </h2>
+              {selectedCars.length > 0 && (
+                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+                  {selectedCars.reduce((a, c) => a + c.quantity, 0)} selected
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {categories.map(cat => {
+                const sel = selectedCars.find(s => s.id === cat._id);
+                return (
+                  <div
+                    key={cat._id}
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                      sel ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center p-1.5 relative">
+                        <img
+                          src={`${API_BASE_URL}/uploads/${cat.image}`}
+                          alt={cat.name}
+                          className="w-full h-full object-contain"
+                          onError={e => { e.target.style.display = 'none'; }}
+                        />
+                        {sel && (
+                          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
+                            <FaCheckCircle className="text-white text-[8px]" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{cat.name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">₹{(cat.bulkBookingBasePrice || 0) * areaMultiplier}/km</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleRemoveCar(cat._id)}
+                        className="w-7 h-7 rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:border-red-300 hover:text-red-500 transition-all"
+                      >
+                        <FaMinus size={10} />
+                      </button>
+                      <span className="text-sm font-bold text-gray-800 w-5 text-center">
+                        {sel?.quantity || 0}
+                      </span>
+                      <button
+                        onClick={() => handleAddCar(cat)}
+                        className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition-all"
+                      >
+                        <FaPlus size={10} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
