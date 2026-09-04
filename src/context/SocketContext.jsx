@@ -178,6 +178,16 @@ export const SocketProvider = ({ children }) => {
       window.dispatchEvent(new CustomEvent('bulk_booking_update', { detail: data }));
     });
 
+    // 💳 Payment Requested Updates (New)
+    newSocket.on('payment_requested', (data) => {
+      console.log('💳 Payment Requested Event:', data);
+      
+      toast.info(`Driver requested payment of ₹${data.finalFare} for Booking ${data.bookingId?.slice(-8)}`, { duration: 6000, icon: '💳' });
+
+      // Dispatch custom event for Booking Pages
+      window.dispatchEvent(new CustomEvent('payment_requested', { detail: data }));
+    });
+
     setSocket(newSocket);
 
     // Cleanup on unmount

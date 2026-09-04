@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { agentService } from '../../api/agentApi';
 import { useSocket } from '../../context/SocketContext';
 import { toast } from 'sonner';
+import Swal from 'sweetalert2';
 import { FaSync, FaPlusCircle, FaArrowLeft } from 'react-icons/fa';
 import BookingTable from '../../components/BookingTable';
 import LiveLocationMonitor from '../../components/LiveLocationMonitor';
@@ -151,17 +152,70 @@ export default function AgentBookings() {
       });
     };
 
+    const handlePaymentRequested = async (event) => {
+      const data = event.detail;
+      console.log("💳 AgentBookings: Payment Requested Event Received:", data);
+      
+      const result = await Swal.fire({
+          title: '🚕 Trip Completed!',
+          html: `
+              <div class="mb-4">
+                  <p class="text-gray-500 mb-1">Total Fare to collect</p>
+                  <p class="text-4xl font-black text-green-600">₹${data.finalFare}</p>
+              </div>
+              <p class="text-sm text-gray-500 mb-4">Driver is requesting payment. Please select the payment method.</p>
+          `,
+          showCancelButton: false,
+          showDenyButton: true,
+          confirmButtonText: 'Pay Online',
+          denyButtonText: 'Pay Cash to Driver',
+          confirmButtonColor: '#10b981',
+          denyButtonColor: '#FACD16',
+          allowOutsideClick: false
+      });
+
+      try {
+          const method = result.isConfirmed ? 'Online' : 'Cash';
+          const res = await agentService.selectPaymentMethod(data.bookingId, { paymentMethod: method });
+          
+          if (res.success) {
+              if (method === 'Cash') {
+                  Swal.fire({
+                      icon: 'success',
+                      title: 'Cash Selected',
+                      text: 'Please ensure cash is handed over to the driver.',
+                      confirmButtonText: 'OK'
+                  });
+              } else {
+                  if (res.paymentLinks && res.paymentLinks.web) {
+                       window.location.href = res.paymentLinks.web;
+                  } else {
+                       Swal.fire('Error', 'Payment link not received', 'error');
+                  }
+              }
+              fetchBookings();
+          } else {
+              Swal.fire('Error', res.message || 'Failed to process payment selection', 'error');
+          }
+      } catch(err) {
+          console.error(err);
+          Swal.fire('Error', 'Failed to process payment selection', 'error');
+      }
+    };
+
     // Listen for custom events
     window.addEventListener('booking_update', handleBookingUpdate);
     window.addEventListener('driver_location_update', handleLocationUpdate);
     window.addEventListener('driver_arrived', handleDriverArrived);
     window.addEventListener('stop_update', handleStopUpdate);
+    window.addEventListener('payment_requested', handlePaymentRequested);
 
     return () => {
       window.removeEventListener('booking_update', handleBookingUpdate);
       window.removeEventListener('driver_location_update', handleLocationUpdate);
       window.removeEventListener('driver_arrived', handleDriverArrived);
       window.removeEventListener('stop_update', handleStopUpdate);
+      window.removeEventListener('payment_requested', handlePaymentRequested);
     };
   }, []);
 

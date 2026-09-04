@@ -369,8 +369,9 @@ export default function MyBulkBookings() {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <p className="text-xs font-medium" style={{ color: tc.textSecondary }}>Offered Amount</p>
-                      <p className="text-lg font-bold" style={{ color: tc.primary }}>₹{req.offeredPrice?.toLocaleString()}</p>
+                      <p className="text-xs font-medium" style={{ color: tc.textSecondary }}>Total (Incl. GST)</p>
+                      <p className="text-lg font-bold" style={{ color: tc.primary }}>₹{(req.totalPriceWithTax || req.offeredPrice)?.toLocaleString()}</p>
+                      <p className="text-[10px]" style={{ color: tc.textSecondary }}>Base: ₹{req.offeredPrice?.toLocaleString()}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${req.tripType === 'RoundTrip' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>

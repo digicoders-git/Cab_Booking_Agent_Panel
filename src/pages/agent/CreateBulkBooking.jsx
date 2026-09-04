@@ -354,9 +354,10 @@ export default function CreateBulkBooking() {
     if (!formData.customerName || !formData.customerPhone) return toast.error("Customer Name and Phone are required");
 
     const total = calculateTotal();
+    const totalWithGst = Math.round(total * 1.05);
     const result = await Swal.fire({
       title: 'Submit Bulk Request?',
-      text: `Total offered amount: ₹${total.toLocaleString()}`,
+      html: `<p style="font-size:14px">Total: <strong style="color:#2563eb">₹${totalWithGst.toLocaleString()}</strong><br/><span style="font-size:11px;color:#6b7280">(Base: ₹${total.toLocaleString()} + GST: ₹${(totalWithGst - total).toLocaleString()})</span></p>`,
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: '#2563EB',
@@ -742,8 +743,20 @@ export default function CreateBulkBooking() {
 
               {/* Total */}
               <div className="bg-blue-600 rounded-xl p-4 text-white text-center mb-4">
-                <p className="text-xs font-medium opacity-80 mb-1">Total Offered Amount</p>
-                <p className="text-3xl font-bold">₹{getUiTotal().toLocaleString()}</p>
+                <p className="text-xs font-medium opacity-80 mb-1">Base Amount</p>
+                <p className="text-sm font-semibold opacity-70">₹{getUiTotal().toLocaleString()}</p>
+                <div className="flex justify-between text-xs opacity-80 mt-2">
+                  <span>CGST (2.5%)</span>
+                  <span>₹{Math.round(getUiTotal() * 0.025).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-xs opacity-80 mt-1">
+                  <span>SGST (2.5%)</span>
+                  <span>₹{Math.round(getUiTotal() * 0.025).toLocaleString()}</span>
+                </div>
+                <div className="border-t border-white/20 mt-2 pt-2">
+                  <p className="text-xs font-medium opacity-80 mb-1">Total Payable (Incl. GST)</p>
+                  <p className="text-3xl font-bold">₹{Math.round(getUiTotal() * 1.05).toLocaleString()}</p>
+                </div>
               </div>
 
               <button

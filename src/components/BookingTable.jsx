@@ -1,6 +1,6 @@
 // src/components/BookingTable.jsx
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { FaChevronDown, FaChevronUp, FaSearch, FaTimes, FaSync, FaBan, FaMapMarkedAlt } from 'react-icons/fa';
+import { FaChevronDown, FaChevronUp, FaSearch, FaTimes, FaSync, FaBan, FaMapMarkedAlt, FaDownload } from 'react-icons/fa';
 import { 
     ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, 
     Phone, MapPin, Clock, User, Calendar, 
@@ -540,6 +540,24 @@ const BookingRow = ({ booking, onRefresh }) => {
 
   const canCancel = ['pending', 'accepted'].includes(booking.bookingStatus?.toLowerCase()); // Pending and Accepted bookings can be cancelled
 
+  const handleDownloadReceipt = async (e) => {
+    e.stopPropagation();
+    try {
+      const response = await agentService.downloadReceipt(booking._id);
+      const url = window.URL.createObjectURL(new Blob([response]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Booking_Receipt_${booking._id.slice(-6)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("Receipt downloaded successfully!");
+    } catch (error) {
+      console.error("Error downloading receipt:", error);
+      toast.error("Failed to download receipt");
+    }
+  };
+
   const handleCancelBooking = async () => {
     if (!cancelReason.trim()) {
       toast.error('Cancel reason zaruri hai');
@@ -659,27 +677,56 @@ const BookingRow = ({ booking, onRefresh }) => {
           </div>
         </td>
       </tr>
-
       {expanded && (
         <tr className="bg-blue-50/40">
           <td colSpan={11} className="px-6 py-4">
-            {/* Map Button - Full Width */}
-            {['accepted', 'ongoing', 'completed'].includes(booking.bookingStatus?.toLowerCase()) && (
-              <button
-                onClick={handleOpenMap}
-                className="w-full mb-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2 font-medium shadow-lg shadow-blue-200"
-              >
-                <FaMapMarkedAlt size={16} />
-                {booking.bookingStatus?.toLowerCase() === 'accepted'
-                  ? '🟢 Track Driver to Pickup Location'
-                  : booking.bookingStatus?.toLowerCase() === 'ongoing' 
-                  ? '🔵 Track Live Location to Drop' 
-                  : booking.bookingStatus?.toLowerCase() === 'completed'
-                  ? '⚪ View Completed Trip Route'
-                  : 'View Route on Google Maps'
-                }
-              </button>
-            )}
+            {/* Action Buttons Row */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-3">
+              {/* Map Button */}
+              {['accepted', 'ongoing', 'completed'].includes(booking.bookingStatus?.toLowerCase()) && (
+                <button
+                  onClick={handleOpenMap}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all flex items-center justify-center gap-2 font-medium shadow-lg shadow-blue-200"
+                >
+                  <FaMapMarkedAlt size={16} />
+                  {booking.bookingStatus?.toLowerCase() === 'accepted'
+                    ? '📍 Track Driver to Pickup'
+                    : booking.bookingStatus?.toLowerCase() === 'ongoing' 
+                    ? '🚗 Track Live Location' 
+                    : booking.bookingStatus?.toLowerCase() === 'completed'
+                    ? '🏁 View Trip Route'
+                    : 'View Route on Map'
+                  }
+                </button>
+              )}
+
+              {/* Pay Now Button for Pending Payments */}
+              {booking.bookingStatus === 'Payment_Pending' && (
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('payment_requested', { 
+                      detail: { 
+                        bookingId: booking._id, 
+                        finalFare: booking.actualFare || booking.fareEstimate 
+                      } 
+                    }));
+                  }}
+                  className="flex-1 px-4 py-3 bg-[#10b981] text-black font-black uppercase tracking-widest rounded-xl hover:bg-[#059669] transition-all flex items-center justify-center gap-2 text-xs shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                >
+                   Pay Now (₹{booking.actualFare || booking.fareEstimate})
+                </button>
+              )}
+
+              {/* Download Receipt Button for Completed Rides */}
+              {booking.bookingStatus?.toLowerCase() === 'completed' && (
+                <button
+                  onClick={handleDownloadReceipt}
+                  className="flex-1 px-4 py-3 bg-gray-800 text-white font-black uppercase tracking-widest rounded-xl hover:bg-gray-900 transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-gray-200"
+                >
+                  <FaDownload size={14} /> Download Receipt
+                </button>
+              )}
+            </div>
             
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div className="bg-white rounded-lg p-2.5 border border-gray-100">

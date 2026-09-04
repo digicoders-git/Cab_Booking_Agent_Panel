@@ -70,6 +70,13 @@ export const agentService = {
     return response.data;
   },
 
+  downloadReceipt: async (bookingId) => {
+    const response = await agentApi.get(`/api/bookings/receipt/${bookingId}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
   // ❌ Cancel Booking
   cancelBooking: async (bookingId, reason) => {
     const response = await agentApi.put(`/api/bookings/cancel/${bookingId}`, { reason });
@@ -147,6 +154,12 @@ export const agentService = {
     const response = await agentApi.get(`/api/bulk-bookings/receipt/${bookingId}`, {
       responseType: 'blob'
     });
+    return response.data;
+  },
+
+  // Payment
+  selectPaymentMethod: async (bookingId, data) => {
+    const response = await agentApi.post(`/api/trips/execute/${bookingId}/select-payment`, data);
     return response.data;
   },
 
