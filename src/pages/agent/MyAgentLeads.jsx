@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { getMyAgentLeads, cancelAgentLead, downloadAgentLeadReceipt } from "../../apis/agentLead";
 import Swal from "sweetalert2";
 import { toast } from "sonner";
-import { FaSyncAlt, FaTimesCircle, FaCar, FaMapMarkerAlt, FaBriefcase, FaDownload } from "react-icons/fa";
+import { FaSyncAlt, FaTimesCircle, FaCar, FaMapMarkerAlt, FaBriefcase, FaDownload, FaKey, FaCopy } from "react-icons/fa";
 import { API_BASE_URL } from "../../api/agentApi";
 
 export default function MyAgentLeads() {
@@ -50,7 +50,7 @@ export default function MyAgentLeads() {
         } else {
           Swal.fire('Error!', res.message || 'Failed to cancel', 'error');
         }
-      } catch (err) {
+      } catch {
         Swal.fire('Error!', 'Server error', 'error');
       }
     }
@@ -77,10 +77,17 @@ export default function MyAgentLeads() {
     }
   };
 
+  const handleCopyOtp = (otp) => {
+    if (!otp) return;
+    navigator.clipboard.writeText(otp);
+    toast.success(`OTP ${otp} copied to clipboard!`);
+  };
+
   const getStatusStyle = (status) => {
     const s = status?.toLowerCase();
     if (s === "marketplace") return { color: "#3B82F6", bg: "rgba(59, 130, 246, 0.1)" };
     if (s === "accepted") return { color: "#F59E0B", bg: "rgba(245, 158, 11, 0.1)" };
+    if (s === "ongoing") return { color: "#8B5CF6", bg: "rgba(139, 92, 246, 0.1)" };
     if (s === "completed") return { color: "#10B981", bg: "rgba(16, 185, 129, 0.1)" };
     if (s === "cancelled") return { color: "#EF4444", bg: "rgba(239, 68, 68, 0.1)" };
     return { color: "#6B7280", bg: "rgba(107, 114, 128, 0.1)" };
@@ -100,6 +107,7 @@ export default function MyAgentLeads() {
             <button
               onClick={fetchLeads}
               className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
+              title="Refresh Leads"
             >
               <FaSyncAlt size={18} className={fetching ? 'animate-spin' : ''} />
             </button>
@@ -124,6 +132,7 @@ export default function MyAgentLeads() {
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 uppercase">ID / Date</th>
                     <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 uppercase">Customer</th>
+                    <th className="text-center py-4 px-6 text-xs font-medium text-gray-500 uppercase">Start OTP</th>
                     <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 uppercase">Route</th>
                     <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 uppercase">Financials</th>
                     <th className="text-left py-4 px-6 text-xs font-medium text-gray-500 uppercase">Driver Assigned</th>
@@ -147,6 +156,24 @@ export default function MyAgentLeads() {
                           <div className="mt-1 text-[10px] px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full inline-block border border-blue-100">
                             {new Date(lead.pickupDateTime).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                           </div>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        {lead.startOtp ? (
+                          <div className="inline-flex flex-col items-center">
+                            <button
+                              onClick={() => handleCopyOtp(lead.startOtp)}
+                              className="group flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg shadow-xs transition-all active:scale-95"
+                              title="Click to copy OTP"
+                            >
+                              <FaKey className="text-amber-500 text-xs" />
+                              <span className="font-mono font-black text-sm tracking-widest text-amber-950">{lead.startOtp}</span>
+                              <FaCopy className="text-amber-400 group-hover:text-amber-700 text-[11px] ml-1" />
+                            </button>
+                            <span className="text-[10px] text-gray-400 mt-1 font-medium">Give to Customer</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 font-mono italic">---</span>
                         )}
                       </td>
                       <td className="py-4 px-6 min-w-[200px]">
@@ -174,7 +201,7 @@ export default function MyAgentLeads() {
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
                               {lead.assignedDriver.image ? (
-                                <img src={`${API_BASE_URL}/uploads/${lead.assignedDriver.image}`} className="w-full h-full object-cover" />
+                                <img src={`${API_BASE_URL}/uploads/${lead.assignedDriver.image}`} className="w-full h-full object-cover" alt="driver" />
                               ) : (
                                 <FaCar className="text-gray-400" />
                               )}
@@ -190,7 +217,7 @@ export default function MyAgentLeads() {
                       </td>
                       <td className="py-4 px-6 text-center">
                         <span
-                          className="px-2 py-1 rounded-full text-xs font-medium"
+                          className="px-2.5 py-1 rounded-full text-xs font-bold tracking-wide uppercase"
                           style={{
                             color: getStatusStyle(lead.status).color,
                             backgroundColor: getStatusStyle(lead.status).bg
@@ -223,7 +250,7 @@ export default function MyAgentLeads() {
                   ))}
                   {leads.length === 0 && !loading && (
                     <tr>
-                      <td colSpan="7" className="py-8 text-center text-gray-500">
+                      <td colSpan="8" className="py-8 text-center text-gray-500">
                         You haven't posted any leads yet.
                       </td>
                     </tr>
