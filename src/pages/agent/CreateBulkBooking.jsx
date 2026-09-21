@@ -182,7 +182,7 @@ export default function CreateBulkBooking() {
 
   const generateReceipt = (booking) => {
     const doc = new jsPDF();
-    const logoUrl = "/logo.png";
+    const logoUrl = "/logo2.png";
     
     doc.setDrawColor(0);
     doc.setLineWidth(0.5);
@@ -569,6 +569,16 @@ export default function CreateBulkBooking() {
                         returnDate: formData.returnDate < selected ? selected : formData.returnDate
                       });
                   }}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Reporting Time *</label>
+                <input
+                  type="time"
+                  value={formData.time}
+                  onChange={e => setFormData({ ...formData, time: e.target.value })}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>

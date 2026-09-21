@@ -167,5 +167,33 @@ export const agentService = {
   rateDriver: async (bookingId, data) => {
     const response = await agentApi.post(`/api/bookings/${bookingId}/rate-driver`, data);
     return response.data;
+  },
+
+  // 🚖 Fixed Routes & Packages
+  getActiveFixedRoutes: async () => {
+    const response = await agentApi.get('/api/fixed-routes/routes/active');
+    return response.data;
+  },
+
+  bookFixedRoute: async (data) => {
+    const response = await agentApi.post('/api/fixed-routes/bookings', data);
+    return response.data;
+  },
+
+  getMyFixedBookings: async () => {
+    const response = await agentApi.get('/api/fixed-routes/bookings/my-bookings');
+    return response.data;
+  },
+
+  cancelFixedBooking: async (id) => {
+    const response = await agentApi.put(`/api/fixed-routes/bookings/${id}/cancel`);
+    return response.data;
+  },
+
+  downloadFixedBookingReceipt: async (id) => {
+    const response = await agentApi.get(`/api/fixed-routes/bookings/${id}/receipt`, {
+      responseType: 'blob'
+    });
+    return response.data;
   }
 };

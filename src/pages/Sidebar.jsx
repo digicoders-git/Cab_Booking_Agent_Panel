@@ -172,7 +172,13 @@ const Sidebar = ({
         </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto py-8 overflow-x-hidden space-y-1">
+        <div
+          className="flex-1 overflow-y-auto py-4 overflow-x-hidden space-y-1 no-scrollbar"
+          style={{
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+        >
           <nav className="px-2 space-y-2" aria-label="Main navigation">
             {visibleRoutes.map((route) => (
               <SidebarItem
