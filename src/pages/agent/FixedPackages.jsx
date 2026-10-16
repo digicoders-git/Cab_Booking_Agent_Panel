@@ -8,7 +8,7 @@ import Swal from 'sweetalert2';
 import {
   FaRoute, FaCar, FaClock, FaRoad, FaMoneyBillWave,
   FaCalendarAlt, FaUser, FaPhone, FaSearch, FaSync,
-  FaCheckCircle, FaTimes, FaMapMarkerAlt, FaPercent, FaPlusCircle
+  FaCheckCircle, FaTimes, FaMapMarkerAlt, FaPercent, FaPlusCircle, FaInfoCircle
 } from 'react-icons/fa';
 
 export default function FixedPackages() {
@@ -298,6 +298,14 @@ export default function FixedPackages() {
                         <span className="font-bold">Commission Share</span>
                       </div>
                     </div>
+
+                    {/* Toll Note Banner */}
+                    <div className="mt-3 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2 text-left">
+                      <FaInfoCircle className="text-amber-500 text-xs mt-0.5 shrink-0" />
+                      <p className="text-[11px] leading-tight text-amber-700 dark:text-amber-300 font-medium">
+                        <span className="font-bold text-amber-800 dark:text-amber-200">Note:</span> Fare ke alawa toll alag se pay karna hoga. Kisi bhi offer / package ride mein toll include nahi hai.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -376,6 +384,14 @@ export default function FixedPackages() {
                   <span className="font-semibold" style={{ color: tc.textSecondary }}>Drop:</span>
                   <span className="font-medium truncate max-w-[250px]" style={{ color: tc.text }}>{selectedRoute.dropLocation}</span>
                 </div>
+              </div>
+
+              {/* Toll Note in Modal */}
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5 text-left">
+                <FaInfoCircle className="text-amber-500 text-sm mt-0.5 shrink-0" />
+                <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300 font-medium">
+                  <strong className="text-amber-700 dark:text-amber-200">Important Note:</strong> Fare ke alawa Toll tax customer ko alag se pay karna hoga. Kisi bhi offer / package ride mein toll include nahi hai.
+                </p>
               </div>
 
               {/* Customer Name */}
