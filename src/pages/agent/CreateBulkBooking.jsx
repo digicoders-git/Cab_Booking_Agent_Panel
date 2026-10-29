@@ -19,6 +19,7 @@ export default function CreateBulkBooking() {
   const [selectedCars, setSelectedCars] = useState([]);
   const [estimatedTax, setEstimatedTax] = useState(0);
   const [areaMultiplier, setAreaMultiplier] = useState(1);
+  const [isBulkOneWayEnabled, setIsBulkOneWayEnabled] = useState(true);
   const [formData, setFormData] = useState({
     date: "", time: "10:00",
     tripType: "OneWay",
@@ -34,9 +35,27 @@ export default function CreateBulkBooking() {
 
   useEffect(() => {
     fetchCategories();
+    fetchAppSettings();
     const timer = setTimeout(initAutocomplete, 1000);
     return () => clearTimeout(timer);
   }, []);
+
+  const fetchAppSettings = async () => {
+    try {
+      const endpoint = `${API_BASE_URL.replace(/\/api\/?$/, '')}/api/settings`;
+      const res = await fetch(endpoint);
+      const data = await res.json();
+      if (data.success && data.settings) {
+        const oneWayOn = data.settings.isBulkOneWayEnabled !== false;
+        setIsBulkOneWayEnabled(oneWayOn);
+        if (!oneWayOn) {
+          setFormData(prev => ({ ...prev, tripType: "RoundTrip" }));
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch settings in agent CreateBulkBooking", e);
+    }
+  };
 
   // 🕒 Auto-calculate days for RoundTrip
   useEffect(() => {
@@ -521,14 +540,16 @@ export default function CreateBulkBooking() {
 
               <div className="sm:col-span-2 space-y-2 mb-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trip Type</label>
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, tripType: "OneWay", days: 1 })}
-                    className={`py-3 rounded-xl font-bold text-sm transition-all border-2 ${formData.tripType === 'OneWay' ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100' : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200'}`}
-                  >
-                    One Way Ride
-                  </button>
+                <div className={`grid ${isBulkOneWayEnabled ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+                  {isBulkOneWayEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, tripType: "OneWay", days: 1 })}
+                      className={`py-3 rounded-xl font-bold text-sm transition-all border-2 ${formData.tripType === 'OneWay' ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100' : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200'}`}
+                    >
+                      One Way Ride
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, tripType: "RoundTrip" })}
